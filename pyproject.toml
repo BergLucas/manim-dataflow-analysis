@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "manim-dataflow-analysis"
+version = "0.1.0"
+description = ""
+authors = ["Berg Lucas <55436804+BergLucas@users.noreply.github.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.13"
+manim = "^0.18.1"
+networkx = ">=2.6"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
