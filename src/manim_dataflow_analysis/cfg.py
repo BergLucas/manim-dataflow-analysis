@@ -191,25 +191,13 @@ def __cfg_node_depth(
 
 def cfg_layout(
     graph: NxGraph,
+    root_vertex: Hashable,
     scale: float | tuple[float, float, float] = 1,
     condition_vertices: dict[Hashable, tuple[Hashable]] | None = None,
     vertex_spacing: tuple[float, float] = (1, 1),
 ) -> dict[Hashable, Point3D]:
-    entry_points = tuple(
-        vertex for vertex in graph.nodes if graph.in_degree(vertex) == 0
-    )
-
-    if not entry_points:
-        raise ValueError(
-            "The CFG layout requires that one vertex does not have any predecessors"
-        )
-
-    if len(entry_points) > 1:
-        raise ValueError(
-            "The CFG layout requires that only one vertex does not have any predecessors"
-        )
-
-    entry_point_vertex = entry_points[0]
+    if condition_vertices is None:
+        raise ValueError("The CFG layout requires the condition vertices to be passed")
 
     if isinstance(scale, float):
         scale_x = scale
@@ -221,7 +209,7 @@ def cfg_layout(
 
     _, height, _, _, coords = __cfg_node_depth(
         graph,
-        entry_point_vertex,
+        root_vertex,
         condition_vertices,
         set(),
     )
@@ -312,6 +300,7 @@ class ControlFlowGraph(DiGraph):
                 "vertex_spacing": vertex_spacing,
             },
             edge_config=edge_config,
+            root_vertex=entry_point,
         )
 
     def __init__(
