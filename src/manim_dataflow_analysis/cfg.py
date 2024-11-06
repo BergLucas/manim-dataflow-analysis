@@ -3,6 +3,7 @@ from __future__ import annotations
 from manim.mobject.geometry.polygram import Rectangle
 from manim.mobject.text.tex_mobject import MathTex, SingleStringMathTex, Tex
 from manim.mobject.geometry.arc import TipableVMobject
+from manim.mobject.geometry.line import Line
 from manim.mobject.text.text_mobject import Text
 from manim.mobject.mobject import Mobject
 from manim.mobject.graph import DiGraph, LayoutName, LayoutFunction
@@ -15,6 +16,8 @@ import numpy as np
 
 
 if TYPE_CHECKING:
+    from manim.mobject.geometry.tips import ArrowTip
+    from typing_extensions import Self
     from manim_dataflow_analysis.ast import AstStatement
     from manim.mobject.graph import NxGraph
     from manim.typing import Point3D
@@ -32,6 +35,17 @@ class PathArrow(TipableVMobject):
 
     def generate_points(self) -> None:
         self.set_points_as_corners(np.array(self.path))
+
+    def reset_endpoints_based_on_tip(self, tip: ArrowTip, at_start: bool) -> Self:
+        return self
+
+    def get_length(self) -> np.floating:
+        length = 0
+        for i in range(len(self.path) - 1):
+            length += np.linalg.norm(
+                np.array(self.path[i]) - np.array(self.path[i + 1])
+            )
+        return length
 
 
 def __cfg_successors(
