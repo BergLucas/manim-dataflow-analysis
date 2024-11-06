@@ -935,6 +935,20 @@ slack = ["slack-sdk"]
 telegram = ["requests"]
 
 [[package]]
+name = "types-networkx"
+version = "3.3.0.20241020"
+description = "Typing stubs for networkx"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "types-networkx-3.3.0.20241020.tar.gz", hash = "sha256:f58991bf1b32eb3d1888f7de119af22af53e97c46e64ee249406eba2f5f3463b"},
+    {file = "types_networkx-3.3.0.20241020-py3-none-any.whl", hash = "sha256:4e5bd9b2a987d7b31b79c1af8675eae52ec50f634779a130cd9e81b2e94a31bd"},
+]
+
+[package.dependencies]
+numpy = ">=1.20,<2.1.0"
+
+[[package]]
 name = "typing-extensions"
 version = "4.12.2"
 description = "Backported and Experimental Type Hints for Python 3.8+"
@@ -1009,4 +1023,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.13"
-content-hash = "60b4e529f3aa8406078f259283f05201ef68be11d510b8b81ba70e2e19a9224d"
+content-hash = "4d7fc62c59d6763f05d0eb060bdf33f8551c054131fb09ec8b4d12c2c57e3a40"

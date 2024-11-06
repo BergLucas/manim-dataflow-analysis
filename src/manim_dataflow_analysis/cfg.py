@@ -6,13 +6,16 @@ from manim.mobject.geometry.arc import TipableVMobject
 from manim.mobject.text.text_mobject import Text
 from manim.mobject.mobject import Mobject
 from manim.mobject.graph import DiGraph, LayoutName, LayoutFunction
-from manim.utils.color import BLACK, WHITE
+from manim.utils.color import GREEN, RED, BLACK, WHITE
 from typing import TYPE_CHECKING, Hashable
+from collections import defaultdict
+from dataclasses import dataclass
 import networkx as nx
 import numpy as np
 
 
 if TYPE_CHECKING:
+    from manim_dataflow_analysis.ast import AstStatement
     from manim.mobject.graph import NxGraph
     from manim.typing import Point3D
 
@@ -243,7 +246,59 @@ class LabeledRectangle(Rectangle):
         self.add(rendered_label)
 
 
+@dataclass(frozen=True)
+class ProgramPoint:
+    point: int
+    statement: AstStatement
+
+
 class ControlFlowGraph(DiGraph):
+
+    @classmethod
+    def from_cfg(
+        cls, entry_point: ProgramPoint, cfg: nx.DiGraph[ProgramPoint]
+    ) -> ControlFlowGraph:
+        labels = {pp: Text(pp.statement.header, color=BLACK) for pp in cfg}
+
+        vertex_spacing = (
+            1 + max(label.width for label in labels.values()),
+            1 + max(label.height for label in labels.values()),
+        )
+
+        edge_cases: defaultdict[ProgramPoint, dict[ProgramPoint, int]] = defaultdict(
+            dict
+        )
+        for start, end, case in cfg.edges.data("case"):
+            if case is not None:
+                edge_cases[start][end] = case
+
+        condition_vertices = {
+            start: tuple(sorted(ends, key=lambda end: ends[end]))
+            for start, ends in edge_cases.items()
+        }
+
+        edge_config: dict[tuple[ProgramPoint, ProgramPoint], dict] = {}
+        for start, ends in condition_vertices.items():
+            for i, end in enumerate(ends):
+                if i == 0:
+                    color = RED
+                elif i == 1:
+                    color = GREEN
+                else:
+                    color = BLACK
+
+                edge_config[(start, end)] = {"color": color}
+
+        return cls.from_networkx(
+            cfg,
+            labels=labels,
+            layout=cfg_layout,
+            layout_config={
+                "condition_vertices": condition_vertices,
+                "vertex_spacing": vertex_spacing,
+            },
+            edge_config=edge_config,
+        )
 
     def __init__(
         self,
