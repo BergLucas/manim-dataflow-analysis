@@ -275,8 +275,8 @@ class ControlFlowGraph(DiGraph):
         labels = {pp: Text(pp.statement.header, color=BLACK) for pp in cfg}
 
         vertex_spacing = (
-            1 + max(label.width for label in labels.values()),
-            1 + max(label.height for label in labels.values()),
+            1.25 * max(label.width for label in labels.values()),
+            2.5 * max(label.height for label in labels.values()),
         )
 
         edge_cases: defaultdict[ProgramPoint, dict[ProgramPoint, int]] = defaultdict(
