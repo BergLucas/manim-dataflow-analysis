@@ -11,7 +11,7 @@ class TestCfgLayout(unittest.TestCase):
         graph.add_edge(2, 3)
         graph.add_edge(3, 4)
 
-        layout = cfg_layout(graph)
+        layout, _ = cfg_layout(graph, root_vertex=1, condition_vertices={})
 
         self.assertDictEqual(
             {node: tuple(coord) for node, coord in layout.items()},
@@ -32,7 +32,7 @@ class TestCfgLayout(unittest.TestCase):
         graph.add_edge(3, 5)
         graph.add_edge(4, 5)
 
-        layout = cfg_layout(graph, condition_vertices={2: [3, 4]})
+        layout, _ = cfg_layout(graph, root_vertex=1, condition_vertices={2: [3, 4]})
 
         self.assertDictEqual(
             {node: tuple(coord) for node, coord in layout.items()},
@@ -56,9 +56,10 @@ class TestCfgLayout(unittest.TestCase):
         graph.add_edge(5, 3)
         graph.add_edge(6, 3)
 
-        layout = cfg_layout(graph, condition_vertices={2: [3, 4], 4: [5, 6]})
+        layout, _ = cfg_layout(
+            graph, root_vertex=1, condition_vertices={2: [3, 4], 4: [5, 6]}
+        )
 
-        print(layout)
         self.assertDictEqual(
             {node: tuple(coord) for node, coord in layout.items()},
             {
@@ -79,7 +80,7 @@ class TestCfgLayout(unittest.TestCase):
         graph.add_edge(2, 4)
         graph.add_edge(4, 2)
 
-        layout = cfg_layout(graph, condition_vertices={2: [3, 4]})
+        layout, _ = cfg_layout(graph, root_vertex=1, condition_vertices={2: [3, 4]})
 
         self.assertDictEqual(
             {node: tuple(coord) for node, coord in layout.items()},
