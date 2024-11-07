@@ -3,12 +3,11 @@ from __future__ import annotations
 from manim.mobject.geometry.polygram import Rectangle
 from manim.mobject.text.tex_mobject import MathTex, SingleStringMathTex, Tex
 from manim.mobject.geometry.arc import TipableVMobject
-from manim.mobject.geometry.line import Line
 from manim.mobject.text.text_mobject import Text
 from manim.mobject.mobject import Mobject
 from manim.mobject.graph import DiGraph, LayoutName, LayoutFunction
 from manim.utils.color import GREEN, RED, BLACK, WHITE
-from typing import TYPE_CHECKING, Hashable
+from typing import TYPE_CHECKING, Hashable, Protocol, Any, cast
 from collections import defaultdict
 from dataclasses import dataclass
 import networkx as nx
@@ -36,6 +35,16 @@ class PathArrow(TipableVMobject):
     def generate_points(self) -> None:
         self.set_points_as_corners(np.array(self.path))
 
+    def get_unpositioned_tip(
+        self,
+        tip_shape: type[ArrowTip] | None = None,
+        tip_length: float | None = None,
+        tip_width: float | None = None,
+    ):
+        tip = super().get_unpositioned_tip(tip_shape, tip_length, tip_width)
+        tip.z_index = self.z_index
+        return tip
+
     def reset_endpoints_based_on_tip(self, tip: ArrowTip, at_start: bool) -> Self:
         return self
 
@@ -46,6 +55,46 @@ class PathArrow(TipableVMobject):
                 np.array(self.path[i]) - np.array(self.path[i + 1])
             )
         return length
+
+
+class GraphNode(Protocol):
+    def get_center(self) -> Point3D: ...
+
+    def get_top(self) -> Point3D: ...
+
+    def get_bottom(self) -> Point3D: ...
+
+    def get_right(self) -> Point3D: ...
+
+    def get_left(self) -> Point3D: ...
+
+    def get_zenith(self) -> Point3D: ...
+
+    def get_nadir(self) -> Point3D: ...
+
+
+class EdgeLayoutFunction(Protocol):
+
+    def __call__(
+        self,
+        vertices: dict[Hashable, GraphNode],
+        start: Hashable,
+        end: Hashable,
+    ) -> list[Point3D]: ...
+
+
+class LayoutAndEdgeLayoutFunction(Protocol):
+
+    def __call__(
+        self,
+        graph: NxGraph,
+        scale: float | tuple[float, float, float] = 2,
+        *args: Any,
+        **kwargs: Any,
+    ) -> tuple[
+        dict[Hashable, Point3D],
+        EdgeLayoutFunction,
+    ]: ...
 
 
 def __cfg_successors(
@@ -192,10 +241,13 @@ def __cfg_node_depth(
 def cfg_layout(
     graph: NxGraph,
     root_vertex: Hashable,
-    scale: float | tuple[float, float, float] = 1,
+    scale: float | tuple[float, float, float] = 2,
     condition_vertices: dict[Hashable, tuple[Hashable]] | None = None,
     vertex_spacing: tuple[float, float] = (1, 1),
-) -> dict[Hashable, Point3D]:
+) -> tuple[
+    dict[Hashable, Point3D],
+    EdgeLayoutFunction,
+]:
     if condition_vertices is None:
         raise ValueError("The CFG layout requires the condition vertices to be passed")
 
@@ -207,19 +259,97 @@ def cfg_layout(
     else:
         scale_x = scale_y = 1
 
-    _, height, _, _, coords = __cfg_node_depth(
+    width, height, _, _, coords = __cfg_node_depth(
         graph,
         root_vertex,
         condition_vertices,
         set(),
     )
 
+    inverted_y_coords = {v: (vx, height - 1 - vy) for v, (vx, vy) in coords.items()}
+
     space_x, space_y = vertex_spacing
 
-    return {
-        v: np.array([space_x * vx / scale_x, space_y * (height - 1 - vy) / scale_y, 0])
-        for v, (vx, vy) in coords.items()
-    }
+    def cfg_edge_layout(
+        vertices: dict[Hashable, GraphNode],
+        start: Hashable,
+        end: Hashable,
+    ) -> list[Point3D]:
+        start_x, start_y = inverted_y_coords[start]
+        end_x, end_y = inverted_y_coords[end]
+
+        node_end_x, node_end_y, node_end_z = vertices[end].get_top()
+
+        path: list[Point3D] = []
+
+        coords_dist_x = abs(start_x - end_x)
+        coords_dist_y = abs(start_y - end_y)
+        vertices_dist_x = abs(
+            vertices[start].get_center()[0] - vertices[end].get_center()[0]
+        )
+        vertices_dist_y = abs(
+            vertices[start].get_center()[1] - vertices[end].get_center()[1]
+        )
+
+        if coords_dist_x == 0:
+            vertices_x_scale = 1
+        else:
+            vertices_x_scale = vertices_dist_x / coords_dist_x
+
+        if coords_dist_y == 0:
+            vertices_y_scale = 1
+        else:
+            vertices_y_scale = vertices_dist_y / coords_dist_y
+
+        if end_x < start_x:
+            node_start_x, node_start_y, node_start_z = vertices[start].get_bottom()
+            path.append(np.array([node_start_x, node_start_y, node_start_z]))
+
+            if start_y > end_y:
+                elbow_y = node_start_y - 0.25 * vertices_y_scale / scale_y
+
+                path.extend(
+                    (
+                        np.array([node_start_x, elbow_y, node_start_z]),
+                        np.array([node_end_x, elbow_y, node_end_z]),
+                    )
+                )
+            elif end_y > start_y:
+                bottom_elbow_y = node_start_y - 0.25 * vertices_y_scale / scale_y
+                right_elbow_x = (
+                    node_start_x + (width - start_x - 0.5) * vertices_x_scale / scale_x
+                )
+                top_elbow_y = node_end_y + 0.25 * vertices_y_scale / scale_y
+                path.extend(
+                    (
+                        np.array([node_start_x, bottom_elbow_y, node_start_z]),
+                        np.array([right_elbow_x, bottom_elbow_y, node_start_z]),
+                        np.array([right_elbow_x, top_elbow_y, node_end_z]),
+                        np.array([node_end_x, top_elbow_y, node_end_z]),
+                    )
+                )
+        elif start_x < end_x:
+            node_start_x, node_start_y, node_start_z = vertices[start].get_right()
+            path.extend(
+                (
+                    np.array([node_start_x, node_start_y, node_start_z]),
+                    np.array([node_end_x, node_start_y, node_end_z]),
+                )
+            )
+        else:
+            path.append(vertices[start].get_bottom())
+
+        path.append(np.array([node_end_x, node_end_y, node_end_z]))
+
+        return path
+
+    return (
+        {
+            v: np.array([space_x * vx / scale_x, space_y * vy / scale_y, 0])
+            for v, (vx, vy) in inverted_y_coords.items()
+        },
+        cfg_edge_layout,
+    )
 
 
 class LabeledRectangle(Rectangle):
@@ -309,7 +439,12 @@ class ControlFlowGraph(DiGraph):
         edges: list[tuple[Hashable, Hashable]],
         labels: bool | dict = True,
         label_fill_color: str = BLACK,
-        layout: LayoutName | dict[Hashable, Point3D] | LayoutFunction = cfg_layout,
+        layout: (
+            LayoutName
+            | dict[Hashable, Point3D]
+            | LayoutFunction
+            | LayoutAndEdgeLayoutFunction
+        ) = cfg_layout,
         layout_scale: float | tuple[float, float, float] = 2,
         layout_config: dict | None = None,
         vertex_type: type[Mobject] = LabeledRectangle,
@@ -344,10 +479,7 @@ class ControlFlowGraph(DiGraph):
     ):
         self.edges: dict[tuple[Hashable, Hashable], PathArrow] = {
             (u, v): self._create_edge_mobject(
-                self[u],
-                self[v],
-                edge_type,
-                self._edge_config[(u, v)],
+                u, v, edge_type, self._edge_config[(u, v)]
             )
             for (u, v) in edges
         }
@@ -361,10 +493,7 @@ class ControlFlowGraph(DiGraph):
             edge_type = type(edge)
             tip = edge.pop_tips()[0]
             new_edge = self._create_edge_mobject(
-                self[u],
-                self[v],
-                edge_type,
-                self._edge_config[(u, v)],
+                u, v, edge_type, self._edge_config[(u, v)]
             )
             edge.become(new_edge)
             edge.add_tip(tip)
@@ -392,12 +521,7 @@ class ControlFlowGraph(DiGraph):
         edge_config = base_edge_config
         self._edge_config[(u, v)] = edge_config
 
-        edge_mobject = self._create_edge_mobject(
-            self[u],
-            self[v],
-            edge_type,
-            edge_config,
-        )
+        edge_mobject = self._create_edge_mobject(u, v, edge_type, edge_config)
         self.edges[(u, v)] = edge_mobject
 
         self.add(edge_mobject)
@@ -406,94 +530,54 @@ class ControlFlowGraph(DiGraph):
 
     def _create_edge_mobject(
         self,
-        start_mobject: Mobject,
-        end_mobject: Mobject,
+        start: Hashable,
+        end: Hashable,
         edge_type: type[PathArrow] = PathArrow,
         edge_config: dict | None = None,
     ):
-        start_mobject_center_x, start_mobject_center_y, start_mobject_center_z = (
-            start_mobject.get_center()
+        return edge_type(
+            *self._edge_layout(self.vertices, start, end),
+            z_index=-1,
+            **edge_config,
         )
-        end_mobject_center_x, _, end_mobject_center_z = end_mobject.get_center()
 
-        _, start_mobject_top_y, _ = start_mobject.get_top()
-        _, start_mobject_bottom_y, _ = start_mobject.get_bottom()
-        start_mobject_left_x, _, _ = start_mobject.get_left()
-        start_mobject_right_x, _, _ = start_mobject.get_right()
-
-        _, end_mobject_top_y, _ = end_mobject.get_top()
-        _, end_mobject_bottom_y, _ = end_mobject.get_bottom()
-
-        points: list[Point3D] = []
-        end_y = end_mobject_top_y
-        end_x = end_mobject_center_x
-        start_y = start_mobject_bottom_y
-
-        if end_mobject_center_x < start_mobject_left_x:
-            start_x = start_mobject_center_x
-            start_y = start_mobject_bottom_y
-            if start_mobject_bottom_y > end_mobject_top_y:
-                mid_point = start_y - self._dist_to_next_mobject_y(start_mobject) / 2
-                points.append((start_x, mid_point, start_mobject_center_z))
-                points.append((end_x, mid_point, end_mobject_center_z))
-            elif end_mobject_bottom_y > start_mobject_top_y:
-                bottom_point = start_y - self._dist_to_next_mobject_y(start_mobject) / 2
-                right_point = self._same_right_block_width(start_mobject, end_mobject)
-                top_point = self._dist_to_previous_mobject_y(end_mobject) / 2
-                points.append((start_x, bottom_point, start_mobject_center_z))
-                points.append((right_point, bottom_point, start_mobject_center_z))
-                points.append((right_point, top_point, end_mobject_center_z))
-                points.append((end_x, top_point, end_mobject_center_z))
-        elif start_mobject_right_x < end_mobject_center_x:
-            start_x = start_mobject_right_x
-            start_y = start_mobject_center_y
-            points.append((end_x, start_y, start_mobject_center_z))
-        else:
-            start_x = end_mobject_center_x
-
-        start = (start_x, start_y, start_mobject_center_z)
-        end = (end_x, end_y, end_mobject_center_z)
-
-        return edge_type(start, *points, end, z_index=-1, **edge_config)
-
-    def _same_right_block_width(
+    def change_layout(
         self,
-        start_mobject: Mobject,
-        end_mobject: Mobject,
-    ) -> float:
-        return 1 + max(
-            (
-                vertex_mobject.get_right()[0]
-                for vertex_mobject in self.vertices.values()
-                if vertex_mobject.get_y() >= start_mobject.get_y()
-                and vertex_mobject.get_y() < end_mobject.get_y()
-                and vertex_mobject.get_x() >= start_mobject.get_x()
-            ),
-            default=start_mobject.get_right()[0],
-        )
+        layout: (
+            LayoutName
+            | dict[Hashable, Point3D]
+            | LayoutFunction
+            | LayoutAndEdgeLayoutFunction
+        ) = "spring",
+        layout_scale: float | tuple[float, float, float] = 2,
+        layout_config: dict[str, Any] | None = None,
+        partitions: list[list[Hashable]] | None = None,
+        root_vertex: Hashable | None = None,
+    ) -> ControlFlowGraph:
+        try:
+            super().change_layout(
+                layout,
+                layout_scale,
+                layout_config,
+                partitions,
+                root_vertex,
+            )
+            self._edge_layout = {}
+        except (TypeError, ValueError) as e:
+            layout_config = {} if layout_config is None else layout_config
+            if partitions is not None and "partitions" not in layout_config:
+                layout_config["partitions"] = partitions
+            if root_vertex is not None and "root_vertex" not in layout_config:
+                layout_config["root_vertex"] = root_vertex
 
-    def _next_mobject_y(self, mobject: Mobject) -> float:
-        return min(
-            (
-                vertex_mobject.get_y()
-                for vertex_mobject in self.vertices.values()
-                if vertex_mobject.get_y() < mobject.get_y()
-            ),
-            default=1,
-        )
+            try:
+                self._layout, self._edge_layout = cast(
+                    LayoutAndEdgeLayoutFunction, layout
+                )(self._graph, scale=layout_scale, **layout_config)
+            except TypeError as te:
+                raise e from te
 
-    def _dist_to_next_mobject_y(self, mobject: Mobject) -> float:
-        return abs(self._next_mobject_y(mobject) - mobject.get_y())
+            for v in self.vertices:
+                self[v].move_to(self._layout[v])
 
-    def _previous_mobject_y(self, mobject: Mobject) -> float:
-        return min(
-            (
-                vertex_mobject.get_y()
-                for vertex_mobject in self.vertices.values()
-                if vertex_mobject.get_y() > mobject.get_y()
-            ),
-            default=1,
-        )
-
-    def _dist_to_previous_mobject_y(self, mobject: Mobject) -> float:
-        return abs(self._previous_mobject_y(mobject) - mobject.get_y())
+        return self
