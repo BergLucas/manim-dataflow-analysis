@@ -581,3 +581,7 @@ class ControlFlowGraph(DiGraph):
                 self[v].move_to(self._layout[v])
 
         return self
+
+    def focus_vertex_at(self, vertex: Hashable, point: Point3D) -> ControlFlowGraph:
+        self.shift(point - self.get_center() - self[vertex].get_center())
+        return self

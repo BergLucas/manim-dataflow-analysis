@@ -37,12 +37,16 @@ class AbstractAnalysisScene(ABC, Scene, Generic[E]):
         )
 
     def show_cfg(self):
-        cfg = ControlFlowGraph.from_cfg(*self.program.to_cfg())
+        entry_point, program_cfg = self.program.to_cfg()
+
+        cfg = ControlFlowGraph.from_cfg(entry_point, program_cfg)
 
         cfg.move_to((0, 0, 0))
         cfg.scale(0.5)
 
         self.play(Create(cfg))
+
+        return entry_point, cfg
 
     def construct(self):
         self.show_code()
@@ -51,6 +55,6 @@ class AbstractAnalysisScene(ABC, Scene, Generic[E]):
 
         self.clear()
 
-        self.show_cfg()
+        entry_point, cfg = self.show_cfg()
 
         self.wait(self.wait_time)
