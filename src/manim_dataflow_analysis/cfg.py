@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from manim.mobject.geometry.polygram import Rectangle
-from manim.mobject.text.tex_mobject import MathTex, SingleStringMathTex, Tex
 from manim.mobject.geometry.arc import TipableVMobject
 from manim.mobject.text.text_mobject import Text
 from manim.mobject.mobject import Mobject
-from manim.mobject.graph import DiGraph, LayoutName, LayoutFunction
-from manim.utils.color import GREEN, RED, BLACK, WHITE
+from manim.mobject.graph import LayoutName, LayoutFunction
+from manim.utils.color import GREEN, RED, BLACK
+from manim_dataflow_analysis.graph import BetterDiGraph, LabeledRectangle
 from typing import TYPE_CHECKING, Hashable, Protocol, Any, cast
 from collections import defaultdict
 from dataclasses import dataclass
@@ -352,39 +351,13 @@ def cfg_layout(
     )
 
 
-class LabeledRectangle(Rectangle):
-
-    def __init__(
-        self,
-        label: str | SingleStringMathTex | Text | Tex,
-        height: float | None = None,
-        width: float | None = None,
-        **kwargs,
-    ) -> None:
-        if isinstance(label, str):
-            rendered_label = MathTex(label, color=BLACK)
-        else:
-            rendered_label = label
-
-        if height is None:
-            height = rendered_label.height + 0.2
-
-        if width is None:
-            width = rendered_label.width + 0.2
-
-        super().__init__(height=height, width=width, **kwargs)
-        self.set_fill(color=WHITE, opacity=1)
-        rendered_label.move_to(self.get_center())
-        self.add(rendered_label)
-
-
 @dataclass(frozen=True)
 class ProgramPoint:
     point: int
     statement: AstStatement
 
 
-class ControlFlowGraph(DiGraph):
+class ControlFlowGraph(BetterDiGraph):
 
     @classmethod
     def from_cfg(
@@ -472,68 +445,12 @@ class ControlFlowGraph(DiGraph):
             edge_config,
         )
 
-    def _populate_edge_dict(
-        self,
-        edges: list[tuple[Hashable, Hashable]],
-        edge_type: type[PathArrow],
-    ):
-        self.edges: dict[tuple[Hashable, Hashable], PathArrow] = {
-            (u, v): self._create_edge_mobject(
-                u, v, edge_type, self._edge_config[(u, v)]
-            )
-            for (u, v) in edges
-        }
-
-        for (u, v), edge in self.edges.items():
-            edge.add_tip(**self._tip_config[(u, v)])
-
-    def update_edges(self, graph: nx.DiGraph):
-        edge: PathArrow
-        for (u, v), edge in graph.edges.items():
-            edge_type = type(edge)
-            tip = edge.pop_tips()[0]
-            new_edge = self._create_edge_mobject(
-                u, v, edge_type, self._edge_config[(u, v)]
-            )
-            edge.become(new_edge)
-            edge.add_tip(tip)
-
-    def _add_edge(
-        self,
-        edge: tuple[Hashable, Hashable],
-        edge_type: type[PathArrow] = PathArrow,
-        edge_config: dict | None = None,
-    ):
-        # Some part of this method is copied from manim.mobject.types.graph.Graph._add_edge
-
-        if edge_config is None:
-            edge_config = self.default_edge_config.copy()
-        added_mobjects = []
-        for v in edge:
-            if v not in self.vertices:
-                added_mobjects.append(self._add_vertex(v))
-        u, v = edge
-
-        self._graph.add_edge(u, v)
-
-        base_edge_config = self.default_edge_config.copy()
-        base_edge_config.update(edge_config)
-        edge_config = base_edge_config
-        self._edge_config[(u, v)] = edge_config
-
-        edge_mobject = self._create_edge_mobject(u, v, edge_type, edge_config)
-        self.edges[(u, v)] = edge_mobject
-
-        self.add(edge_mobject)
-        added_mobjects.append(edge_mobject)
-        return self.get_group_class()(*added_mobjects)
-
     def _create_edge_mobject(
         self,
         start: Hashable,
         end: Hashable,
-        edge_type: type[PathArrow] = PathArrow,
-        edge_config: dict | None = None,
+        edge_type: type[PathArrow],
+        edge_config: dict,
     ):
         return edge_type(
             *self._edge_layout(self.vertices, start, end),

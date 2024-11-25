@@ -4,19 +4,21 @@ from typing import TypeVar, Generic, Hashable
 from manim.scene.scene import Scene
 from manim_dataflow_analysis.ast import AstProgram
 from manim_dataflow_analysis.cfg import ControlFlowGraph, ProgramPoint
+from manim_dataflow_analysis.lattice import LatticeGraph, Lattice
 from manim.mobject.geometry.line import Arrow
 from manim.mobject.text.code_mobject import Code
 from manim.mobject.text.text_mobject import Text
-from manim.animation.creation import Create, Write, Unwrite
+from manim.animation.creation import Create, Uncreate, Write, Unwrite
 from manim.constants import LEFT, RIGHT, DOWN
 import networkx as nx
 import numpy as np
 
 
+L = TypeVar("L", bound=Hashable)
 E = TypeVar("E", bound=Hashable)
 
 
-class AbstractAnalysisScene(ABC, Scene, Generic[E]):
+class AbstractAnalysisScene(ABC, Scene, Generic[L, E]):
 
     title_wait_time: int = 2.5
 
@@ -25,6 +27,10 @@ class AbstractAnalysisScene(ABC, Scene, Generic[E]):
     program_conversion_wait_time: int = 2.5
 
     cfg_wait_time: int = 5
+
+    lattice_wait_time: int = 5
+
+    sorting_function = lambda it: it
 
     @property
     def title(self) -> str:
@@ -45,6 +51,11 @@ class AbstractAnalysisScene(ABC, Scene, Generic[E]):
     @abstractmethod
     def program(self) -> AstProgram:
         """The program to analyse."""
+
+    @property
+    @abstractmethod
+    def lattice(self) -> Lattice[L]:
+        """The lattice of the analysis."""
 
     @abstractmethod
     def condition_update(self, condition: E):
@@ -122,7 +133,36 @@ class AbstractAnalysisScene(ABC, Scene, Generic[E]):
 
         self.play(Create(arrow))
 
-        return self.show_cfg(position=program.get_right() + RIGHT * 5, scale=0.33)
+        entry_point, program_cfg, cfg = self.show_cfg(
+            position=program.get_right() + RIGHT * 5, scale=0.33
+        )
+
+        self.play(Uncreate(arrow))
+
+        self.remove(program_cfg)
+
+        return entry_point, program_cfg, cfg
+
+    def show_lattice(
+        self,
+        position: tuple[int, int, int] = (0, 0, 0),
+        scale: float = 0.25,
+        max_horizontal_size: int = 8,
+        max_vertical_size: int = 8,
+    ):
+        lattice = LatticeGraph(
+            self.lattice,
+            max_horizontal_size=max_horizontal_size,
+            max_vertical_size=max_vertical_size,
+            layout_config=dict(sorting_function=self.sorting_function),
+        )
+
+        lattice.move_to(position)
+        lattice.scale(scale)
+
+        self.play(Create(lattice))
+
+        self.wait(self.lattice_wait_time)
 
     def construct(self):
         self.show_title()
@@ -132,3 +172,7 @@ class AbstractAnalysisScene(ABC, Scene, Generic[E]):
         entry_point, program_cfg, cfg = self.show_program_conversion(
             program, program_subtitle
         )
+
+        self.clear()
+
+        self.show_lattice()
