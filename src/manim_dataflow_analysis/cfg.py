@@ -82,6 +82,14 @@ class EdgeLayoutFunction(Protocol):
     ) -> list[Point3D]: ...
 
 
+def default_edge_layout(
+    vertices: dict[Hashable, GraphNode],
+    start: Hashable,
+    end: Hashable,
+) -> list[Point3D]:
+    return [vertices[start].get_center(), vertices[end].get_center()]
+
+
 class LayoutAndEdgeLayoutFunction(Protocol):
 
     def __call__(
@@ -479,7 +487,7 @@ class ControlFlowGraph(BetterDiGraph):
                 partitions,
                 root_vertex,
             )
-            self._edge_layout = {}
+            self._edge_layout = default_edge_layout
         except (TypeError, ValueError) as e:
             layout_config = {} if layout_config is None else layout_config
             if partitions is not None and "partitions" not in layout_config:
