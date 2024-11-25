@@ -261,7 +261,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         incomplete_vertices: list[LatticeNode[L]] = []
 
         while worklist:
-            vertex, invert_direction, size = worklist.pop()
+            vertex, invert_direction, size = worklist.pop(0)
 
             vertices.add(vertex)
 
@@ -304,7 +304,9 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                 continue
 
             for child in children:
-                if child not in vertices:
+                if child not in vertices and all(
+                    work_vertex != child for work_vertex, _, _ in worklist
+                ):
                     worklist.append((child, invert_direction, children_size))
 
                 if invert_direction:
