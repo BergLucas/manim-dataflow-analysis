@@ -30,7 +30,7 @@ class AbstractAnalysisScene(ABC, Scene, Generic[L, E]):
 
     lattice_wait_time: int = 5
 
-    sorting_function = lambda it: it
+    sorting_function = lambda it: list(it)
 
     @property
     def title(self) -> str:
