@@ -424,14 +424,14 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         cls,
         iterable: Iterable[L],
         max_horizontal_size_per_vertex: int,
-    ) -> tuple[list[L], bool]:
+    ) -> tuple[set[L], bool]:
         iterator = iter(iterable)
-        children: list[L] = []
+        children: set[L] = set()
         is_finished = False
 
         for _ in range(max_horizontal_size_per_vertex - 1):
             try:
-                children.append(next(iterator))
+                children.add(next(iterator))
             except StopIteration:
                 is_finished = True
                 break
@@ -447,7 +447,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         infinite_vertices: dict[InfiniteNode[L], list[L]],
         half_vertical_size: int,
         vertex: L,
-        children: list[L],
+        children: set[L],
         children_depth: int,
         invert_direction: bool,
     ) -> bool:
@@ -497,7 +497,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         vertex: L,
         depth: int,
         invert_direction: bool,
-    ) -> tuple[list[L], bool]:
+    ) -> tuple[set[L], bool]:
         if invert_direction:
             children, is_finished = cls._take_max_horizontal_size(
                 lattice.predecessors(vertex), max_horizontal_size_per_vertex
