@@ -349,7 +349,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                 edges.add(edge)
 
             if not is_finished:
-                cls._handle_finished(
+                cls._handle_not_finished(
                     (
                         top_incomplete_vertices
                         if invert_direction
@@ -615,7 +615,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                     infinite_vertices[infinite_vertex] = [lattice.bottom()]
 
     @classmethod
-    def _handle_finished(
+    def _handle_not_finished(
         cls,
         incomplete_vertices: dict[IncompleteNode[L], list[tuple[L, bool]]],
         vertex: L,
