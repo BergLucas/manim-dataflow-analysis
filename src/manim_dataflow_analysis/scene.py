@@ -4,7 +4,11 @@ from typing import TypeVar, Generic, Hashable
 from manim.scene.scene import Scene
 from manim_dataflow_analysis.ast import AstProgram
 from manim_dataflow_analysis.cfg import ControlFlowGraph, ProgramPoint
-from manim_dataflow_analysis.lattice import LatticeGraph, Lattice
+from manim_dataflow_analysis.lattice import (
+    LatticeGraph,
+    Lattice,
+    default_sorting_function,
+)
 from manim.mobject.geometry.line import Arrow
 from manim.mobject.text.code_mobject import Code
 from manim.mobject.text.text_mobject import Text
@@ -30,7 +34,7 @@ class AbstractAnalysisScene(ABC, Scene, Generic[L, E]):
 
     lattice_wait_time: int = 5
 
-    sorting_function = lambda it: list(it)
+    sorting_function = default_sorting_function
 
     @property
     def title(self) -> str:
@@ -154,7 +158,7 @@ class AbstractAnalysisScene(ABC, Scene, Generic[L, E]):
             self.lattice,
             max_horizontal_size=max_horizontal_size,
             max_vertical_size=max_vertical_size,
-            layout_config=dict(sorting_function=self.sorting_function),
+            layout_config=dict(sorting_function=type(self).sorting_function),
         )
 
         lattice.move_to(position)
