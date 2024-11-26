@@ -378,58 +378,25 @@ class LatticeGraph(Generic[L], BetterDiGraph):
 
             children_depth = depth + 1
 
-            if children:
-                should_add_incomplete_vertex = 0
-            else:
-                should_add_incomplete_vertex = 1
-
             if (
                 invert_direction
-                and children_depth + should_add_incomplete_vertex
-                >= self._half_top_vertical_size - 1
+                and self._should_not_add_children(
+                    top_infinite_vertices,
+                    vertex,
+                    children,
+                    children_depth,
+                    invert_direction,
+                )
             ) or (
                 not invert_direction
-                and children_depth + should_add_incomplete_vertex
-                >= self._half_bottom_vertical_size - 1
+                and self._should_not_add_children(
+                    bottom_infinite_vertices,
+                    vertex,
+                    children,
+                    children_depth,
+                    invert_direction,
+                )
             ):
-                if children:
-                    if invert_direction:
-                        for infinite_vertex in top_infinite_vertices:
-                            nearest_ancestor = self._lattice.nearest_ancestor(
-                                vertex, infinite_vertex.base_node
-                            )
-
-                            if nearest_ancestor == self._lattice.bottom():
-                                continue
-
-                            top_children = top_infinite_vertices.pop(infinite_vertex)
-                            top_children.append(vertex)
-                            top_infinite_vertices[InfiniteNode(nearest_ancestor)] = (
-                                top_children
-                            )
-                            break
-                        else:
-                            top_infinite_vertices[InfiniteNode(vertex)] = [vertex]
-                    else:
-                        for infinite_vertex in bottom_infinite_vertices:
-                            nearest_descendant = self._lattice.nearest_descendant(
-                                vertex, infinite_vertex.base_node
-                            )
-
-                            if nearest_descendant == self._lattice.top():
-                                continue
-
-                            bottom_parents = bottom_infinite_vertices.pop(
-                                infinite_vertex
-                            )
-                            bottom_parents.append(vertex)
-                            bottom_infinite_vertices[
-                                InfiniteNode(nearest_descendant)
-                            ] = bottom_parents
-                            break
-                        else:
-                            bottom_infinite_vertices[InfiniteNode(vertex)] = [vertex]
-
                 continue
 
             for child in children:
@@ -497,6 +464,50 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                     edges.add((bottom_infinite_vertex, top_infinite_vertex))
 
         return vertices, edges
+
+    def _should_not_add_children(
+        self,
+        infinite_vertices: dict[InfiniteNode[L], list[L]],
+        vertex: L,
+        children: list[L],
+        children_depth: int,
+        invert_direction: bool,
+    ) -> bool:
+        incomplete_vertex_number = 0 if children else 1
+        half_vertical_size = (
+            self._half_top_vertical_size
+            if invert_direction
+            else self._half_bottom_vertical_size
+        )
+
+        if children_depth + incomplete_vertex_number < half_vertical_size - 1:
+            return False
+
+        if not children:
+            return True
+
+        for infinite_vertex in infinite_vertices:
+            if invert_direction:
+                nearest_connection = self._lattice.nearest_ancestor(
+                    vertex, infinite_vertex.base_node
+                )
+                if nearest_connection == self._lattice.bottom():
+                    continue
+            else:
+                nearest_connection = self._lattice.nearest_descendant(
+                    vertex, infinite_vertex.base_node
+                )
+                if nearest_connection == self._lattice.top():
+                    continue
+
+            connections = infinite_vertices.pop(infinite_vertex)
+            connections.append(vertex)
+            infinite_vertices[InfiniteNode(nearest_connection)] = connections
+            break
+        else:
+            infinite_vertices[InfiniteNode(vertex)] = [vertex]
+
+        return True
 
     def _get_children(
         self,
