@@ -151,12 +151,12 @@ class AbstractAnalysisScene(ABC, Scene, Generic[L, E]):
         self,
         position: tuple[int, int, int] = (0, 0, 0),
         scale: float = 0.25,
-        max_horizontal_size: int = 8,
+        max_horizontal_size_per_vertex: int = 8,
         max_vertical_size: int = 8,
     ):
         lattice = LatticeGraph(
             self.lattice,
-            max_horizontal_size_per_vertex=max_horizontal_size,
+            max_horizontal_size_per_vertex=max_horizontal_size_per_vertex,
             max_vertical_size=max_vertical_size,
             layout_config=dict(sorting_function=type(self).sorting_function),
         )
