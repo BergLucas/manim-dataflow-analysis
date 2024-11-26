@@ -240,14 +240,17 @@ class InfiniteNode(Generic[L]):
 @dataclass(frozen=True, order=False)
 class IncompleteNode(Generic[L]):
     depth: int
+    invert_direction: bool
 
     def __str__(self) -> str:
         return "..."
 
     def __lt__(self, other: Any) -> bool:
         if isinstance(other, IncompleteNode):
-            return self.depth < other.depth
-
+            return self.invert_direction < other.invert_direction or (
+                self.invert_direction == other.invert_direction
+                and self.depth < other.depth
+            )
         elif isinstance(other, InfiniteNode):
             return True
         else:
@@ -259,7 +262,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
     def __init__(
         self,
         lattice: Lattice[L],
-        max_horizontal_size: int = 10,
+        max_horizontal_size_per_vertex: int = 4,
         max_vertical_size: int = 10,
         labels_size: float = 0.5,
         labels: bool | dict = True,
@@ -277,7 +280,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         edge_config: dict | None = None,
     ) -> None:
         self._lattice = lattice
-        self._max_horizontal_size = max_horizontal_size
+        self._max_horizontal_size_per_vertex = max_horizontal_size_per_vertex
         self._half_bottom_vertical_size = math.floor(max_vertical_size / 2)
         self._half_top_vertical_size = math.ceil(max_vertical_size / 2)
         self._edge_infinity_type = edge_infinity_type
@@ -313,19 +316,14 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         children: list[L] = []
         is_finished = False
 
-        for _ in range(self._max_horizontal_size - 2):
+        for _ in range(self._max_horizontal_size_per_vertex - 1):
             try:
                 children.append(next(iterator))
             except StopIteration:
                 is_finished = True
                 break
         else:
-            child = next(iterator, None)
-
-            is_finished = child is None
-
-            if child is not None:
-                children.append(child)
+            is_finished = next(iterator, None) is None
 
         return children, is_finished
 
@@ -340,8 +338,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             ]
         ],
     ]:
-        bottom_vertices: set[L | InfiniteNode[L] | IncompleteNode[L]] = set()
-        top_vertices: set[L | InfiniteNode[L] | IncompleteNode[L]] = set()
+        vertices: set[L | InfiniteNode[L] | IncompleteNode[L]] = set()
         bottom_infinite_vertices: dict[InfiniteNode[L], list[L]] = {}
         top_infinite_vertices: dict[InfiniteNode[L], list[L]] = {}
         bottom_incomplete_vertices: dict[IncompleteNode, list[tuple[L, bool]]] = (
@@ -366,27 +363,52 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             vertex, invert_direction, depth = worklist.pop(0)
 
             if invert_direction:
-                top_vertices.add(vertex)
+                vertices.add(vertex)
                 children, is_finished = self._take_max_horizontal_size(
                     self._lattice.predecessors(vertex)
                 )
                 if self._lattice.has_other_successors_than(
                     vertex, *(end for start, end in edges if start == vertex)
                 ):
-                    top_incomplete_vertices[IncompleteNode(depth - 1)].append(
-                        (vertex, True)
+                    incomplete_vertex = IncompleteNode(depth - 1, invert_direction)
+
+                    top_max_incomplete_vertex = max(
+                        top_incomplete_vertices, default=None
                     )
+
+                    top_incomplete_vertices[incomplete_vertex].append((vertex, True))
+
+                    if (
+                        top_max_incomplete_vertex is not None
+                        and top_max_incomplete_vertex != incomplete_vertex
+                    ):
+                        top_incomplete_vertices[incomplete_vertex].append(
+                            (top_max_incomplete_vertex, False)
+                        )
+
             else:
-                bottom_vertices.add(vertex)
+                vertices.add(vertex)
                 children, is_finished = self._take_max_horizontal_size(
                     self._lattice.successors(vertex)
                 )
                 if self._lattice.has_other_predecessors_than(
                     vertex, *(start for start, end in edges if end == vertex)
                 ):
-                    bottom_incomplete_vertices[IncompleteNode(depth - 1)].append(
-                        (vertex, True)
+                    incomplete_vertex = IncompleteNode(depth - 1, invert_direction)
+
+                    bottom_max_incomplete_vertex = max(
+                        bottom_incomplete_vertices, default=None
                     )
+
+                    bottom_incomplete_vertices[incomplete_vertex].append((vertex, True))
+
+                    if (
+                        bottom_max_incomplete_vertex is not None
+                        and bottom_max_incomplete_vertex != incomplete_vertex
+                    ):
+                        bottom_incomplete_vertices[incomplete_vertex].append(
+                            (bottom_max_incomplete_vertex, False)
+                        )
 
             children_depth = depth + 1
 
@@ -445,10 +467,8 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                 continue
 
             for child in children:
-                if (
-                    child not in bottom_vertices
-                    and child not in top_vertices
-                    and all(work_vertex != child for work_vertex, _, _ in worklist)
+                if child not in vertices and all(
+                    work_vertex != child for work_vertex, _, _ in worklist
                 ):
                     worklist.append((child, invert_direction, children_depth))
 
@@ -460,29 +480,56 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                 edges.add(edge)
 
             if not is_finished:
+                incomplete_vertex = IncompleteNode(children_depth, invert_direction)
+
                 if invert_direction:
-                    top_incomplete_vertices[IncompleteNode(children_depth)].append(
-                        (vertex, False)
+                    top_max_incomplete_vertex = max(
+                        top_incomplete_vertices, default=None
                     )
+
+                    top_incomplete_vertices[incomplete_vertex].append((vertex, False))
+
+                    if (
+                        top_max_incomplete_vertex is not None
+                        and top_max_incomplete_vertex != incomplete_vertex
+                    ):
+                        top_incomplete_vertices[incomplete_vertex].append(
+                            (top_max_incomplete_vertex, True)
+                        )
                 else:
-                    bottom_incomplete_vertices[IncompleteNode(children_depth)].append(
+                    bottom_max_incomplete_vertex = max(
+                        bottom_incomplete_vertices, default=None
+                    )
+
+                    bottom_incomplete_vertices[incomplete_vertex].append(
                         (vertex, False)
                     )
 
-        vertices = bottom_vertices.union(top_vertices)
+                    if (
+                        bottom_max_incomplete_vertex is not None
+                        and bottom_max_incomplete_vertex != incomplete_vertex
+                    ):
+                        bottom_incomplete_vertices[incomplete_vertex].append(
+                            (bottom_max_incomplete_vertex, True)
+                        )
 
         for bottom_infinite_vertex, bottom_parents in bottom_infinite_vertices.items():
             vertices.add(bottom_infinite_vertex)
 
-            max_incomplete_depth = max(bottom_incomplete_vertices, default=None)
+            incomplete_vertex = IncompleteNode(
+                self._half_bottom_vertical_size - 2, False
+            )
 
-            if max_incomplete_depth is not None:
-                bottom_incomplete_vertices[
-                    IncompleteNode(self._half_bottom_vertical_size - 1)
-                ].extend(
+            max_incomplete_vertex = max(bottom_incomplete_vertices, default=None)
+
+            if (
+                max_incomplete_vertex is not None
+                and max_incomplete_vertex != incomplete_vertex
+            ):
+                bottom_incomplete_vertices[incomplete_vertex].extend(
                     (
                         (bottom_infinite_vertex, True),
-                        (max_incomplete_depth, False),
+                        (max_incomplete_vertex, False),
                     )
                 )
 
@@ -492,15 +539,20 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         for top_infinite_vertex, top_children in top_infinite_vertices.items():
             vertices.add(top_infinite_vertex)
 
-            max_incomplete_depth = max(top_incomplete_vertices, default=None)
+            incomplete_vertex = IncompleteNode(
+                self._half_bottom_vertical_size - 2, True
+            )
 
-            if max_incomplete_depth is not None:
-                top_incomplete_vertices[
-                    IncompleteNode(self._half_top_vertical_size - 1)
-                ].extend(
+            max_incomplete_vertex = max(top_incomplete_vertices, default=None)
+
+            if (
+                max_incomplete_vertex is not None
+                and max_incomplete_vertex != incomplete_vertex
+            ):
+                top_incomplete_vertices[incomplete_vertex].extend(
                     (
                         (top_infinite_vertex, False),
-                        (max_incomplete_depth, True),
+                        (max_incomplete_vertex, True),
                     )
                 )
 
@@ -509,22 +561,36 @@ class LatticeGraph(Generic[L], BetterDiGraph):
 
         for (
             incomplete_vertex,
-            bottom_incomplete_vertex,
+            bottom_children,
         ) in bottom_incomplete_vertices.items():
             vertices.add(incomplete_vertex)
-            for bottom_vertex, invert_direction in bottom_incomplete_vertex:
+
+            for bottom_vertex, invert_direction in bottom_children:
                 if invert_direction:
                     edges.add((incomplete_vertex, bottom_vertex))
                 else:
                     edges.add((bottom_vertex, incomplete_vertex))
 
-        for incomplete_vertex, top_incomplete_vertex in top_incomplete_vertices.items():
+            if all(start != incomplete_vertex for start, _ in edges):
+                infinite_vertex = InfiniteNode(self._lattice.bottom())
+                vertices.add(infinite_vertex)
+                edges.add((incomplete_vertex, infinite_vertex))
+                bottom_infinite_vertices[infinite_vertex] = [self._lattice.bottom()]
+
+        for incomplete_vertex, top_parents in top_incomplete_vertices.items():
             vertices.add(incomplete_vertex)
-            for top_vertex, invert_direction in top_incomplete_vertex:
+
+            for top_vertex, invert_direction in top_parents:
                 if invert_direction:
                     edges.add((top_vertex, incomplete_vertex))
                 else:
                     edges.add((incomplete_vertex, top_vertex))
+
+            if all(end != incomplete_vertex for _, end in edges):
+                infinite_vertex = InfiniteNode(self._lattice.top())
+                vertices.add(infinite_vertex)
+                edges.add((infinite_vertex, incomplete_vertex))
+                top_infinite_vertices[infinite_vertex] = [self._lattice.top()]
 
         for bottom_infinite_vertex in bottom_infinite_vertices:
             for top_infinite_vertex in top_infinite_vertices:

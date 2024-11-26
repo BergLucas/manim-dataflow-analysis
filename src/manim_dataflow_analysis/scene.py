@@ -156,7 +156,7 @@ class AbstractAnalysisScene(ABC, Scene, Generic[L, E]):
     ):
         lattice = LatticeGraph(
             self.lattice,
-            max_horizontal_size=max_horizontal_size,
+            max_horizontal_size_per_vertex=max_horizontal_size,
             max_vertical_size=max_vertical_size,
             layout_config=dict(sorting_function=type(self).sorting_function),
         )
