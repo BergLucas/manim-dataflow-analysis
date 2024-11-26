@@ -502,18 +502,18 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             children, is_finished = cls._take_max_horizontal_size(
                 lattice.predecessors(vertex), max_horizontal_size_per_vertex
             )
-            is_incomplete = lattice.has_other_successors_than(
+            previous_is_incomplete = lattice.has_other_successors_than(
                 vertex, *(end for start, end in edges if start == vertex)
             )
         else:
             children, is_finished = cls._take_max_horizontal_size(
                 lattice.successors(vertex), max_horizontal_size_per_vertex
             )
-            is_incomplete = lattice.has_other_predecessors_than(
+            previous_is_incomplete = lattice.has_other_predecessors_than(
                 vertex, *(start for start, end in edges if end == vertex)
             )
 
-        if is_incomplete:
+        if previous_is_incomplete:
             incomplete_vertex = IncompleteNode(depth - 1, invert_direction)
 
             max_incomplete_vertex = max(incomplete_vertices, default=None)
