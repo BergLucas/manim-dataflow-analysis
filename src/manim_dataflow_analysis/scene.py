@@ -153,8 +153,8 @@ class AbstractAnalysisScene(ABC, Scene, Generic[L, E]):
         scale: float = 0.25,
         max_horizontal_size_per_vertex: int = 8,
         max_vertical_size: int = 8,
-    ):
-        lattice = LatticeGraph(
+    ) -> LatticeGraph[L]:
+        lattice = LatticeGraph.from_lattice(
             self.lattice,
             max_horizontal_size_per_vertex=max_horizontal_size_per_vertex,
             max_vertical_size=max_vertical_size,
@@ -168,6 +168,8 @@ class AbstractAnalysisScene(ABC, Scene, Generic[L, E]):
 
         self.wait(self.lattice_wait_time)
 
+        return lattice
+
     def construct(self):
         self.show_title()
 
@@ -179,4 +181,4 @@ class AbstractAnalysisScene(ABC, Scene, Generic[L, E]):
 
         self.clear()
 
-        self.show_lattice()
+        lattice = self.show_lattice()

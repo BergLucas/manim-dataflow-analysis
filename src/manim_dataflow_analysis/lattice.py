@@ -259,85 +259,21 @@ class IncompleteNode(Generic[L]):
 
 class LatticeGraph(Generic[L], BetterDiGraph):
 
-    def __init__(
-        self,
+    @classmethod
+    def from_lattice(
+        cls,
         lattice: Lattice[L],
         max_horizontal_size_per_vertex: int = 4,
         max_vertical_size: int = 10,
-        labels_size: float = 0.5,
         labels: bool | dict = True,
+        labels_size: float = 0.5,
         label_fill_color: str = BLACK,
-        layout: LayoutName | dict[Hashable, Point3D] | LayoutFunction = lattice_layout,
-        layout_scale: float | tuple[float, float, float] = 2,
-        layout_config: dict | None = None,
-        vertex_type: type[Mobject] = LabeledDot,
-        vertex_config: dict | None = None,
-        vertex_mobjects: dict | None = None,
-        edge_type: type[TipableVMobject] = Line,
-        edge_infinity_type: type[TipableVMobject] = DashedLine,
-        partitions: list[list[Hashable]] | None = None,
-        root_vertex: Hashable | None = None,
-        edge_config: dict | None = None,
-    ) -> None:
-        self._lattice = lattice
-        self._max_horizontal_size_per_vertex = max_horizontal_size_per_vertex
-        self._half_bottom_vertical_size = math.floor(max_vertical_size / 2)
-        self._half_top_vertical_size = math.ceil(max_vertical_size / 2)
-        self._edge_infinity_type = edge_infinity_type
+        layout_scale: float = 2,
+        **kwargs,
+    ) -> LatticeGraph[L]:
+        half_bottom_vertical_size = math.floor(max_vertical_size / 2)
+        half_top_vertical_size = math.ceil(max_vertical_size / 2)
 
-        vertices, edges = self._build_vertices_and_edges()
-
-        if isinstance(labels, bool) and labels:
-            labels = {}
-            for vertex in vertices:
-                text = Text(str(vertex), fill_color=label_fill_color)
-                text.scale(labels_size * layout_scale / max(text.width, text.height))
-                labels[vertex] = text
-
-        super().__init__(
-            vertices,
-            edges,
-            labels,
-            label_fill_color,
-            layout,
-            layout_scale,
-            layout_config,
-            vertex_type,
-            vertex_config,
-            vertex_mobjects,
-            edge_type,
-            partitions,
-            root_vertex,
-            edge_config,
-        )
-
-    def _take_max_horizontal_size(self, iterable: Iterable[L]) -> tuple[list[L], bool]:
-        iterator = iter(iterable)
-        children: list[L] = []
-        is_finished = False
-
-        for _ in range(self._max_horizontal_size_per_vertex - 1):
-            try:
-                children.append(next(iterator))
-            except StopIteration:
-                is_finished = True
-                break
-        else:
-            is_finished = next(iterator, None) is None
-
-        return children, is_finished
-
-    def _build_vertices_and_edges(
-        self,
-    ) -> tuple[
-        set[L | InfiniteNode[L] | IncompleteNode[L]],
-        set[
-            tuple[
-                L | InfiniteNode[L] | IncompleteNode[L],
-                L | InfiniteNode[L] | IncompleteNode[L],
-            ]
-        ],
-    ]:
         vertices: set[L | InfiniteNode[L] | IncompleteNode[L]] = set()
         bottom_infinite_vertices: dict[InfiniteNode[L], list[L]] = {}
         top_infinite_vertices: dict[InfiniteNode[L], list[L]] = {}
@@ -355,8 +291,8 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         ] = set()
 
         worklist: list[tuple[L, bool, int]] = [
-            (self._lattice.top(), True, 0),
-            (self._lattice.bottom(), False, 0),
+            (lattice.top(), True, 0),
+            (lattice.bottom(), False, 0),
         ]
 
         while worklist:
@@ -364,7 +300,9 @@ class LatticeGraph(Generic[L], BetterDiGraph):
 
             vertices.add(vertex)
 
-            children, is_finished = self._get_children(
+            children, is_finished = cls._get_children(
+                lattice,
+                max_horizontal_size_per_vertex,
                 (
                     top_incomplete_vertices
                     if invert_direction
@@ -378,24 +316,22 @@ class LatticeGraph(Generic[L], BetterDiGraph):
 
             children_depth = depth + 1
 
-            if (
-                invert_direction
-                and self._should_not_add_children(
-                    top_infinite_vertices,
-                    vertex,
-                    children,
-                    children_depth,
-                    invert_direction,
-                )
-            ) or (
-                not invert_direction
-                and self._should_not_add_children(
-                    bottom_infinite_vertices,
-                    vertex,
-                    children,
-                    children_depth,
-                    invert_direction,
-                )
+            if cls._should_not_add_children(
+                lattice,
+                (
+                    top_infinite_vertices
+                    if invert_direction
+                    else bottom_infinite_vertices
+                ),
+                (
+                    half_top_vertical_size
+                    if invert_direction
+                    else half_bottom_vertical_size
+                ),
+                vertex,
+                children,
+                children_depth,
+                invert_direction,
             ):
                 continue
 
@@ -413,7 +349,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                 edges.add(edge)
 
             if not is_finished:
-                self._handle_finished(
+                cls._handle_finished(
                     (
                         top_incomplete_vertices
                         if invert_direction
@@ -424,23 +360,26 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                     invert_direction,
                 )
 
-        self._handle_infinite_vertices(
+        cls._handle_infinite_vertices(
             bottom_infinite_vertices,
             bottom_incomplete_vertices,
+            half_bottom_vertical_size,
             vertices,
             edges,
             False,
         )
 
-        self._handle_infinite_vertices(
+        cls._handle_infinite_vertices(
             top_infinite_vertices,
             top_incomplete_vertices,
+            half_top_vertical_size,
             vertices,
             edges,
             True,
         )
 
-        self._handle_incomplete_vertices(
+        cls._handle_incomplete_vertices(
+            lattice,
             bottom_incomplete_vertices,
             bottom_infinite_vertices,
             vertices,
@@ -448,7 +387,8 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             False,
         )
 
-        self._handle_incomplete_vertices(
+        cls._handle_incomplete_vertices(
+            lattice,
             top_incomplete_vertices,
             top_infinite_vertices,
             vertices,
@@ -458,27 +398,60 @@ class LatticeGraph(Generic[L], BetterDiGraph):
 
         for bottom_infinite_vertex in bottom_infinite_vertices:
             for top_infinite_vertex in top_infinite_vertices:
-                if self._lattice.includes(
+                if lattice.includes(
                     top_infinite_vertex.base_node, bottom_infinite_vertex.base_node
                 ):
                     edges.add((bottom_infinite_vertex, top_infinite_vertex))
 
-        return vertices, edges
+        if isinstance(labels, bool) and labels:
+            labels = {}
+            for vertex in vertices:
+                text = Text(str(vertex), fill_color=label_fill_color)
+                text.scale(labels_size * layout_scale / max(text.width, text.height))
+                labels[vertex] = text
 
+        return cls(
+            vertices,
+            edges,
+            labels,
+            label_fill_color=label_fill_color,
+            layout_scale=layout_scale,
+            **kwargs,
+        )
+
+    @classmethod
+    def _take_max_horizontal_size(
+        cls,
+        iterable: Iterable[L],
+        max_horizontal_size_per_vertex: int,
+    ) -> tuple[list[L], bool]:
+        iterator = iter(iterable)
+        children: list[L] = []
+        is_finished = False
+
+        for _ in range(max_horizontal_size_per_vertex - 1):
+            try:
+                children.append(next(iterator))
+            except StopIteration:
+                is_finished = True
+                break
+        else:
+            is_finished = next(iterator, None) is None
+
+        return children, is_finished
+
+    @classmethod
     def _should_not_add_children(
-        self,
+        cls,
+        lattice: Lattice[L],
         infinite_vertices: dict[InfiniteNode[L], list[L]],
+        half_vertical_size: int,
         vertex: L,
         children: list[L],
         children_depth: int,
         invert_direction: bool,
     ) -> bool:
         incomplete_vertex_number = 0 if children else 1
-        half_vertical_size = (
-            self._half_top_vertical_size
-            if invert_direction
-            else self._half_bottom_vertical_size
-        )
 
         if children_depth + incomplete_vertex_number < half_vertical_size - 1:
             return False
@@ -488,16 +461,16 @@ class LatticeGraph(Generic[L], BetterDiGraph):
 
         for infinite_vertex in infinite_vertices:
             if invert_direction:
-                nearest_connection = self._lattice.nearest_ancestor(
+                nearest_connection = lattice.nearest_ancestor(
                     vertex, infinite_vertex.base_node
                 )
-                if nearest_connection == self._lattice.bottom():
+                if nearest_connection == lattice.bottom():
                     continue
             else:
-                nearest_connection = self._lattice.nearest_descendant(
+                nearest_connection = lattice.nearest_descendant(
                     vertex, infinite_vertex.base_node
                 )
-                if nearest_connection == self._lattice.top():
+                if nearest_connection == lattice.top():
                     continue
 
             connections = infinite_vertices.pop(infinite_vertex)
@@ -509,8 +482,11 @@ class LatticeGraph(Generic[L], BetterDiGraph):
 
         return True
 
+    @classmethod
     def _get_children(
-        self,
+        cls,
+        lattice: Lattice[L],
+        max_horizontal_size_per_vertex: int,
         incomplete_vertices: dict[IncompleteNode[L], list[tuple[L, bool]]],
         edges: set[
             tuple[
@@ -523,17 +499,17 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         invert_direction: bool,
     ) -> tuple[list[L], bool]:
         if invert_direction:
-            children, is_finished = self._take_max_horizontal_size(
-                self._lattice.predecessors(vertex)
+            children, is_finished = cls._take_max_horizontal_size(
+                lattice.predecessors(vertex), max_horizontal_size_per_vertex
             )
-            is_incomplete = self._lattice.has_other_successors_than(
+            is_incomplete = lattice.has_other_successors_than(
                 vertex, *(end for start, end in edges if start == vertex)
             )
         else:
-            children, is_finished = self._take_max_horizontal_size(
-                self._lattice.successors(vertex)
+            children, is_finished = cls._take_max_horizontal_size(
+                lattice.successors(vertex), max_horizontal_size_per_vertex
             )
-            is_incomplete = self._lattice.has_other_predecessors_than(
+            is_incomplete = lattice.has_other_predecessors_than(
                 vertex, *(start for start, end in edges if end == vertex)
             )
 
@@ -556,10 +532,12 @@ class LatticeGraph(Generic[L], BetterDiGraph):
 
         return children, is_finished
 
+    @classmethod
     def _handle_infinite_vertices(
-        self,
+        cls,
         infinite_vertices: dict[InfiniteNode[L], list[L]],
         incomplete_vertices: dict[IncompleteNode[L], list[tuple[L, bool]]],
+        half_vertical_size: int,
         vertices: set[L | InfiniteNode[L] | IncompleteNode[L]],
         edges: set[
             tuple[
@@ -572,16 +550,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         for infinite_vertex, connections in infinite_vertices.items():
             vertices.add(infinite_vertex)
 
-            if invert_direction:
-                incomplete_vertex = IncompleteNode(
-                    self._half_top_vertical_size - 2,
-                    invert_direction,
-                )
-            else:
-                incomplete_vertex = IncompleteNode(
-                    self._half_bottom_vertical_size - 2,
-                    invert_direction,
-                )
+            incomplete_vertex = IncompleteNode(half_vertical_size - 2, invert_direction)
 
             max_incomplete_vertex = max(incomplete_vertices, default=None)
 
@@ -602,8 +571,10 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                 else:
                     edges.add((connection, infinite_vertex))
 
+    @classmethod
     def _handle_incomplete_vertices(
-        self,
+        cls,
+        lattice: Lattice[L],
         incomplete_vertices: dict[IncompleteNode[L], list[tuple[L, bool]]],
         infinite_vertices: dict[InfiniteNode[L], list[L]],
         vertices: set[L | InfiniteNode[L] | IncompleteNode[L]],
@@ -626,10 +597,10 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                         edges.add((incomplete_vertex, connection_vertex))
 
                 if all(end != incomplete_vertex for _, end in edges):
-                    infinite_vertex = InfiniteNode(self._lattice.top())
+                    infinite_vertex = InfiniteNode(lattice.top())
                     vertices.add(infinite_vertex)
                     edges.add((infinite_vertex, incomplete_vertex))
-                    infinite_vertices[infinite_vertex] = [self._lattice.top()]
+                    infinite_vertices[infinite_vertex] = [lattice.top()]
             else:
                 for connection_vertex, connection_invert_direction in connections:
                     if connection_invert_direction:
@@ -638,13 +609,14 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                         edges.add((connection_vertex, incomplete_vertex))
 
                 if all(start != incomplete_vertex for start, _ in edges):
-                    infinite_vertex = InfiniteNode(self._lattice.bottom())
+                    infinite_vertex = InfiniteNode(lattice.bottom())
                     vertices.add(infinite_vertex)
                     edges.add((incomplete_vertex, infinite_vertex))
-                    infinite_vertices[infinite_vertex] = [self._lattice.bottom()]
+                    infinite_vertices[infinite_vertex] = [lattice.bottom()]
 
+    @classmethod
     def _handle_finished(
-        self,
+        cls,
         incomplete_vertices: dict[IncompleteNode[L], list[tuple[L, bool]]],
         vertex: L,
         children_depth: int,
@@ -663,6 +635,42 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             incomplete_vertices[incomplete_vertex].append(
                 (max_incomplete_vertex, not invert_direction)
             )
+
+    def __init__(
+        self,
+        vertices: list[Hashable],
+        edges: list[tuple[Hashable, Hashable]],
+        labels: bool | dict = True,
+        label_fill_color: str = BLACK,
+        layout: LayoutName | dict[Hashable, Point3D] | LayoutFunction = lattice_layout,
+        layout_scale: float | tuple[float, float, float] = 2,
+        layout_config: dict | None = None,
+        vertex_type: type[Mobject] = LabeledDot,
+        vertex_config: dict | None = None,
+        vertex_mobjects: dict | None = None,
+        edge_type: type[TipableVMobject] = Line,
+        edge_infinity_type: type[TipableVMobject] = DashedLine,
+        partitions: list[list[Hashable]] | None = None,
+        root_vertex: Hashable | None = None,
+        edge_config: dict | None = None,
+    ) -> None:
+        self._edge_infinity_type = edge_infinity_type
+        super().__init__(
+            vertices,
+            edges,
+            labels,
+            label_fill_color,
+            layout,
+            layout_scale,
+            layout_config,
+            vertex_type,
+            vertex_config,
+            vertex_mobjects,
+            edge_type,
+            partitions,
+            root_vertex,
+            edge_config,
+        )
 
     def _create_edge_mobject(
         self,
