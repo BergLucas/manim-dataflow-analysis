@@ -208,8 +208,6 @@ def lattice_layout(
 
     coords: dict[Hashable, (int, int)] = {}
     for height, vertices in heights_layer.items():
-        print(repr(vertices))
-        print(sorting_function(vertices))
         for i, vertex in enumerate(sorting_function(vertices)):
             coords[vertex] = (i - len(vertices) / 2, height)
 
@@ -315,7 +313,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         children: list[L] = []
         is_finished = False
 
-        for _ in range(self._max_horizontal_size - 1):
+        for _ in range(self._max_horizontal_size - 2):
             try:
                 children.append(next(iterator))
             except StopIteration:
