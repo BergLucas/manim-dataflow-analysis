@@ -406,6 +406,28 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                     invert_direction,
                 )
 
+        unprocessed_visible_vertices = tuple(
+            vertex for vertex in visible_vertices if vertex not in vertices
+        )
+
+        cls._add_unprocessed_vertices(
+            lattice,
+            top_infinite_vertices,
+            vertices,
+            edges,
+            unprocessed_visible_vertices,
+            True,
+        )
+
+        cls._add_unprocessed_vertices(
+            lattice,
+            bottom_infinite_vertices,
+            vertices,
+            edges,
+            unprocessed_visible_vertices,
+            False,
+        )
+
         cls._create_infinite_edges(
             bottom_infinite_vertices,
             bottom_incomplete_vertices,
@@ -608,6 +630,79 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             incomplete_vertices[incomplete_vertex].add(
                 (max_incomplete_vertex, not invert_direction)
             )
+
+    @classmethod
+    def _add_unprocessed_vertices(
+        cls,
+        lattice: Lattice[L],
+        infinite_vertices: dict[InfiniteNode[L], set[L]],
+        vertices: set[L | InfiniteNode[L] | IncompleteNode[L]],
+        edges: set[
+            tuple[
+                L | InfiniteNode[L] | IncompleteNode[L],
+                L | InfiniteNode[L] | IncompleteNode[L],
+            ]
+        ],
+        unprocessed_visible_vertices: tuple[L],
+        invert_direction: bool,
+    ) -> None:
+        for infinite_vertex, connections in infinite_vertices.items():
+            for visible_vertex in unprocessed_visible_vertices:
+                if invert_direction:
+                    included = lattice.includes(
+                        visible_vertex, infinite_vertex.base_node
+                    )
+                else:
+                    included = lattice.includes(
+                        infinite_vertex.base_node, visible_vertex
+                    )
+
+                if not included or infinite_vertex.base_node == visible_vertex:
+                    continue
+
+                infinite_visible_vertex = InfiniteNode(visible_vertex)
+
+                vertices.update(
+                    (
+                        visible_vertex,
+                        infinite_visible_vertex,
+                    )
+                )
+
+                if invert_direction:
+                    edges.update(
+                        (
+                            (infinite_vertex, visible_vertex),
+                            (visible_vertex, infinite_visible_vertex),
+                        )
+                    )
+
+                    visible_vertex_connections = set(
+                        connection
+                        for connection in connections
+                        if lattice.includes(connection, visible_vertex)
+                    )
+                else:
+                    edges.update(
+                        (
+                            (infinite_visible_vertex, visible_vertex),
+                            (visible_vertex, infinite_vertex),
+                        )
+                    )
+
+                    visible_vertex_connections = set(
+                        connection
+                        for connection in connections
+                        if lattice.includes(visible_vertex, connection)
+                    )
+
+                connections.difference_update(visible_vertex_connections)
+
+                for visible_vertex_connection in visible_vertex_connections:
+                    if invert_direction:
+                        edges.add((infinite_visible_vertex, visible_vertex_connection))
+                    else:
+                        edges.add((visible_vertex_connection, infinite_visible_vertex))
 
     @classmethod
     def _create_infinite_edges(
