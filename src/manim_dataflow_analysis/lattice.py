@@ -317,7 +317,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                 half_vertical_size = half_top_vertical_size
                 infinite_vertices = top_infinite_vertices
                 children_iterable = lattice.predecessors(vertex)
-                filtered_visible_vertices = tuple(
+                children_visible_vertices = tuple(
                     visible_vertex
                     for visible_vertex in visible_vertices
                     if lattice.is_predecessor(vertex, visible_vertex)
@@ -327,7 +327,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                 half_vertical_size = half_bottom_vertical_size
                 infinite_vertices = bottom_infinite_vertices
                 children_iterable = lattice.successors(vertex)
-                filtered_visible_vertices = tuple(
+                children_visible_vertices = tuple(
                     visible_vertex
                     for visible_vertex in visible_vertices
                     if lattice.is_successor(vertex, visible_vertex)
@@ -338,8 +338,8 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                 max_horizontal_size_per_vertex,
             )
 
-            if filtered_visible_vertices:
-                children.update(filtered_visible_vertices)
+            if children_visible_vertices:
+                children.update(children_visible_vertices)
 
                 if invert_direction:
                     is_finished = not lattice.has_other_predecessors_than(
@@ -369,7 +369,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
 
             if not add_children:
                 cls._add_children_to_worklist(
-                    filtered_visible_vertices,
+                    children_visible_vertices,
                     vertices,
                     worklist,
                     edges,
@@ -378,7 +378,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                     invert_direction,
                 )
 
-                if children and children.isdisjoint(filtered_visible_vertices):
+                if children and children.isdisjoint(children_visible_vertices):
                     cls._add_infinite_vertices(
                         lattice,
                         infinite_vertices,
