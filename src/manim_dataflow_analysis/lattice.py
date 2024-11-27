@@ -44,7 +44,7 @@ class Lattice(Protocol[L]):
 
     def is_successor(self, value: L, successor: L) -> bool:
         return any(
-            successor == successor_value for successor_value in self.successors(value)
+            successor == value_successor for value_successor in self.successors(value)
         )
 
     def has_other_successors_than(self, value: L, *successors: L) -> bool:
@@ -56,8 +56,8 @@ class Lattice(Protocol[L]):
 
     def is_predecessor(self, value: L, predecessor: L) -> bool:
         return any(
-            predecessor == predecessor_value
-            for predecessor_value in self.predecessors(value)
+            predecessor == value_predecessor
+            for value_predecessor in self.predecessors(value)
         )
 
     def has_other_predecessors_than(self, value: L, *successors: L) -> bool:
