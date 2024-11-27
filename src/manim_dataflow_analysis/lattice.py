@@ -45,7 +45,7 @@ class Lattice(Protocol[L]):
             successor == value_successor for value_successor in self.successors(value)
         )
 
-    def has_other_successors_than(self, value: L, *successors: L) -> bool:
+    def has_other_successors_than(self, value: L, successors: set[L]) -> bool:
         return any(
             value_successor not in successors
             for value_successor in self.successors(value)
@@ -101,10 +101,10 @@ class Lattice(Protocol[L]):
             for value_predecessor in self.predecessors(value)
         )
 
-    def has_other_predecessors_than(self, value: L, *successors: L) -> bool:
+    def has_other_predecessors_than(self, value: L, predecessors: set[L]) -> bool:
         return any(
-            value_successor not in successors
-            for value_successor in self.predecessors(value)
+            value_predecessor not in predecessors
+            for value_predecessor in self.predecessors(value)
         )
 
     def ancestors(self, value: L) -> Iterable[L]:
@@ -452,11 +452,11 @@ class LatticeGraph(Generic[L], BetterDiGraph):
 
                 if invert_direction:
                     is_finished = not lattice.has_other_predecessors_than(
-                        vertex, *children
+                        vertex, children
                     )
                 else:
                     is_finished = not lattice.has_other_successors_than(
-                        vertex, *children
+                        vertex, children
                     )
 
             cls._create_incomplete_vertex(
@@ -644,12 +644,12 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         if invert_direction:
             incomplete = lattice.has_other_successors_than(
                 vertex,
-                *(end for start, end in edges if start == vertex),
+                set(end for start, end in edges if start == vertex),
             )
         else:
             incomplete = lattice.has_other_predecessors_than(
                 vertex,
-                *(start for start, end in edges if end == vertex),
+                set(start for start, end in edges if end == vertex),
             )
 
         if not incomplete:
@@ -788,7 +788,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                 vertices.add(infinite_visible_vertex)
 
                 if invert_direction:
-                    predecessor_visible_vertices = tuple(
+                    predecessor_visible_vertices = set(
                         predecessor
                         for predecessor in unprocessed_visible_vertices
                         if lattice.is_predecessor(visible_vertex, predecessor)
@@ -800,7 +800,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                         edges.add((predecessor_visible_vertex, visible_vertex))
 
                     if lattice.has_other_predecessors_than(
-                        visible_vertex, *predecessor_visible_vertices
+                        visible_vertex, predecessor_visible_vertices
                     ):
                         edges.add((infinite_vertex, visible_vertex))
 
@@ -810,7 +810,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                         if lattice.includes(connection, visible_vertex)
                     )
                 else:
-                    successor_visible_vertices = tuple(
+                    successor_visible_vertices = set(
                         successor
                         for successor in unprocessed_visible_vertices
                         if lattice.is_successor(visible_vertex, successor)
@@ -822,7 +822,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                         edges.add((visible_vertex, successor_visible_vertex))
 
                     if lattice.has_other_successors_than(
-                        visible_vertex, *successor_visible_vertices
+                        visible_vertex, successor_visible_vertices
                     ):
                         edges.add((visible_vertex, infinite_vertex))
 
