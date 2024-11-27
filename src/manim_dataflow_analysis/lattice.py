@@ -73,6 +73,14 @@ class Lattice(Protocol[L]):
 
     def join(self, value1: L, value2: L) -> L: ...
 
+    def path(self, start: L, end: L) -> Iterable[L]: ...
+
+    def path_length(self, start: L, end: L) -> float:
+        return sum(
+            (1.0 for _ in self.path(start, end)),
+            start=0.0,
+        )
+
 
 class FiniteSizeLattice(Lattice[L]):
 
@@ -155,6 +163,9 @@ class FiniteSizeLattice(Lattice[L]):
             raise ValueError("Lattice has no join value")
 
         return joined_value
+
+    def path(self, start: L, end: L) -> Iterable[L]:
+        return nx.shortest_path(self.__graph, start, end)
 
 
 def __get_vertices_heights(
