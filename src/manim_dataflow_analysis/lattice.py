@@ -317,7 +317,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                 half_vertical_size = half_top_vertical_size
                 infinite_vertices = top_infinite_vertices
                 children_iterable = lattice.predecessors(vertex)
-                children_visible_vertices = tuple(
+                children_visible_vertices = set(
                     visible_vertex
                     for visible_vertex in visible_vertices
                     if lattice.is_predecessor(vertex, visible_vertex)
@@ -327,7 +327,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                 half_vertical_size = half_bottom_vertical_size
                 infinite_vertices = bottom_infinite_vertices
                 children_iterable = lattice.successors(vertex)
-                children_visible_vertices = tuple(
+                children_visible_vertices = set(
                     visible_vertex
                     for visible_vertex in visible_vertices
                     if lattice.is_successor(vertex, visible_vertex)
@@ -377,8 +377,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                     children_depth,
                     invert_direction,
                 )
-
-                if children and children.isdisjoint(children_visible_vertices):
+                if children and children != children_visible_vertices:
                     cls._add_infinite_vertices(
                         lattice,
                         infinite_vertices,
@@ -406,7 +405,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                     invert_direction,
                 )
 
-        unprocessed_visible_vertices = tuple(
+        unprocessed_visible_vertices = set(
             vertex for vertex in visible_vertices if vertex not in vertices
         )
 
@@ -643,7 +642,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                 L | InfiniteNode[L] | IncompleteNode[L],
             ]
         ],
-        unprocessed_visible_vertices: tuple[L],
+        unprocessed_visible_vertices: set[L],
         invert_direction: bool,
     ) -> None:
         for infinite_vertex, connections in infinite_vertices.items():
