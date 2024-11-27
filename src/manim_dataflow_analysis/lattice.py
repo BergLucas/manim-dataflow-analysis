@@ -291,8 +291,8 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         ] = set()
 
         worklist: list[tuple[L, bool, int]] = [
-            (lattice.top(), True, 0),
             (lattice.bottom(), False, 0),
+            (lattice.top(), True, 0),
         ]
 
         while worklist:
