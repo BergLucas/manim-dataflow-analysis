@@ -339,7 +339,6 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             )
 
             if filtered_visible_vertices:
-                visible_vertices.difference_update(filtered_visible_vertices)
                 children.update(filtered_visible_vertices)
 
                 if invert_direction:
@@ -369,27 +368,35 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             )
 
             if not add_children:
-                if children:
+                cls._add_children_to_worklist(
+                    filtered_visible_vertices,
+                    vertices,
+                    worklist,
+                    edges,
+                    vertex,
+                    children_depth,
+                    invert_direction,
+                )
+
+                if children and children.isdisjoint(filtered_visible_vertices):
                     cls._add_infinite_vertices(
                         lattice,
                         infinite_vertices,
                         vertex,
                         invert_direction,
                     )
+
                 continue
 
-            for child in children:
-                if child not in vertices and all(
-                    work_vertex != child for work_vertex, _, _ in worklist
-                ):
-                    worklist.append((child, invert_direction, children_depth))
-
-                if invert_direction:
-                    edge = (child, vertex)
-                else:
-                    edge = (vertex, child)
-
-                edges.add(edge)
+            cls._add_children_to_worklist(
+                children,
+                vertices,
+                worklist,
+                edges,
+                vertex,
+                children_depth,
+                invert_direction,
+            )
 
             if not is_finished:
                 cls._create_incomplete_vertices(
@@ -550,6 +557,35 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             break
         else:
             infinite_vertices[InfiniteNode(vertex)] = [vertex]
+
+    @classmethod
+    def _add_children_to_worklist(
+        cls,
+        children: set[L],
+        vertices: set[L | InfiniteNode[L] | IncompleteNode[L]],
+        worklist: list[tuple[L, bool, int]],
+        edges: set[
+            tuple[
+                L | InfiniteNode[L] | IncompleteNode[L],
+                L | InfiniteNode[L] | IncompleteNode[L],
+            ]
+        ],
+        vertex: L,
+        children_depth: int,
+        invert_direction: bool,
+    ) -> None:
+        for child in children:
+            if child not in vertices and all(
+                work_vertex != child for work_vertex, _, _ in worklist
+            ):
+                worklist.append((child, invert_direction, children_depth))
+
+            if invert_direction:
+                edge = (child, vertex)
+            else:
+                edge = (vertex, child)
+
+            edges.add(edge)
 
     @classmethod
     def _create_incomplete_vertices(
