@@ -38,8 +38,6 @@ class Lattice(Protocol[L]):
 
     def bottom(self) -> L: ...
 
-    def nearest_descendant(self, value1: L, value2: L) -> L: ...
-
     def successors(self, value: L) -> Iterable[L]: ...
 
     def is_successor(self, value: L, successor: L) -> bool:
@@ -53,7 +51,47 @@ class Lattice(Protocol[L]):
             for value_successor in self.successors(value)
         )
 
-    def nearest_ancestor(self, value1: L, value2: L) -> L: ...
+    def descendants(self, value: L) -> Iterable[L]:
+        for successor in self.successors(value):
+            yield successor
+            yield from self.descendants(successor)
+
+    def is_descendant(self, value: L, descendant: L) -> bool:
+        return any(
+            descendant == value_descendant
+            for value_descendant in self.descendants(value)
+        )
+
+    def is_descendant_of_all_successors(self, value: L, descendant: L) -> bool:
+        return all(
+            self.is_descendant(child, descendant) for child in self.successors(value)
+        )
+
+    def nearest_descendant(self, value1: L, value2: L) -> L:
+        return self.__nearest_descendant_distance(value1, value2)[0]
+
+    def __nearest_descendant_distance(self, value1: L, value2: L) -> tuple[L, float]:
+        if value1 == value2:
+            return value1, 0.0
+
+        min_distance = float("inf")
+        nearest_descendant = self.top()
+
+        for successor in self.successors(value1):
+            descendant, distance = self.__nearest_descendant_distance(successor, value2)
+
+            if distance < min_distance:
+                min_distance = distance
+                nearest_descendant = descendant
+
+        for successor in self.successors(value2):
+            descendant, distance = self.__nearest_descendant_distance(value1, successor)
+
+            if distance < min_distance:
+                min_distance = distance
+                nearest_descendant = descendant
+
+        return nearest_descendant, min_distance + 1.0
 
     def predecessors(self, value: L) -> Iterable[L]: ...
 
@@ -69,9 +107,52 @@ class Lattice(Protocol[L]):
             for value_successor in self.predecessors(value)
         )
 
-    def includes(self, including: L, included: L) -> bool: ...
+    def ancestors(self, value: L) -> Iterable[L]:
+        for predecessor in self.predecessors(value):
+            yield predecessor
+            yield from self.ancestors(predecessor)
 
-    def join(self, value1: L, value2: L) -> L: ...
+    def is_ancestor(self, value: L, ancestor: L) -> bool:
+        return any(
+            ancestor == value_ancestor for value_ancestor in self.ancestors(value)
+        )
+
+    def is_ancestor_of_all_predecessors(self, value: L, ancestor: L) -> bool:
+        return all(
+            self.is_ancestor(parent, ancestor) for parent in self.predecessors(value)
+        )
+
+    def nearest_ancestor(self, value1: L, value2: L) -> L:
+        return self.__nearest_ancestor_distance(value1, value2)[0]
+
+    def __nearest_ancestor_distance(self, value1: L, value2: L) -> tuple[L, float]:
+        if value1 == value2:
+            return value1, 0.0
+
+        min_distance = float("inf")
+        nearest_ancestor = self.bottom()
+
+        for predecessor in self.predecessors(value1):
+            ancestor, distance = self.__nearest_ancestor_distance(predecessor, value2)
+
+            if distance < min_distance:
+                min_distance = distance
+                nearest_ancestor = ancestor
+
+        for predecessor in self.predecessors(value2):
+            ancestor, distance = self.__nearest_ancestor_distance(value1, predecessor)
+
+            if distance < min_distance:
+                min_distance = distance
+                nearest_ancestor = ancestor
+
+        return nearest_ancestor, min_distance + 1.0
+
+    def includes(self, including: L, included: L) -> bool:
+        return including == included or self.is_ancestor(including, included)
+
+    def join(self, value1: L, value2: L) -> L:
+        return self.nearest_descendant(value1, value2)
 
     def path(self, start: L, end: L) -> Iterable[L]: ...
 
@@ -107,12 +188,27 @@ class FiniteSizeLattice(Lattice[L]):
 
         return bottom[0]
 
+    def successors(self, value: L) -> Iterable[L]:
+        return self.__graph.successors(value)
+
+    def is_successor(self, value: L, successor: L) -> bool:
+        return self.__graph.has_edge(value, successor)
+
+    def descendants(self, value: L) -> Iterable[L]:
+        return nx.descendants(self.__graph, value)
+
+    def is_descendant(self, value: L, descendant: L) -> bool:
+        return nx.has_path(self.__graph, value, descendant)
+
     def nearest_descendant(self, value1: L, value2: L) -> L:
+        if value1 == value2:
+            return value1
+
         descendants1 = nx.descendants(self.__graph, value1)
         descendants2 = nx.descendants(self.__graph, value2)
 
         min_distance = float("inf")
-        nearest_descendant = None
+        nearest_descendant = self.top()
 
         for descendant in descendants1 & descendants2:
             length1 = nx.shortest_path_length(self.__graph, value1, descendant)
@@ -123,19 +219,29 @@ class FiniteSizeLattice(Lattice[L]):
                 min_distance = distance
                 nearest_descendant = descendant
 
-        assert nearest_descendant is not None
-
         return nearest_descendant
 
-    def successors(self, value: L) -> Iterable[L]:
-        return self.__graph.successors(value)
+    def predecessors(self, value: L) -> Iterable[L]:
+        return self.__graph.predecessors(value)
+
+    def is_predecessor(self, value: L, predecessor: L) -> bool:
+        return self.__graph.has_edge(predecessor, value)
+
+    def ancestors(self, value: L) -> Iterable[L]:
+        return nx.ancestors(self.__graph, value)
+
+    def is_ancestor(self, value: L, ancestor: L) -> bool:
+        return nx.has_path(self.__graph, ancestor, value)
 
     def nearest_ancestor(self, value1: L, value2: L) -> L:
+        if value1 == value2:
+            return value1
+
         ancestors1 = nx.ancestors(self.__graph, value1)
         ancestors2 = nx.ancestors(self.__graph, value2)
 
         min_distance = float("inf")
-        nearest_ancestor = None
+        nearest_ancestor = self.bottom()
 
         for ancestor in ancestors1 & ancestors2:
             length1 = nx.shortest_path_length(self.__graph, value1, ancestor)
@@ -146,21 +252,13 @@ class FiniteSizeLattice(Lattice[L]):
                 min_distance = distance
                 nearest_ancestor = ancestor
 
-        assert nearest_ancestor is not None
-
         return nearest_ancestor
-
-    def predecessors(self, value: L) -> Iterable[L]:
-        return self.__graph.predecessors(value)
-
-    def includes(self, including: L, included: L) -> bool:
-        return including == included or nx.has_path(self.__graph, included, including)
 
     def join(self, value1: L, value2: L) -> L:
         joined_value: L | None = nx.lowest_common_ancestor(self.__graph, value1, value2)
 
         if joined_value is None:
-            raise ValueError("Lattice has no join value")
+            joined_value = self.top()
 
         return joined_value
 
