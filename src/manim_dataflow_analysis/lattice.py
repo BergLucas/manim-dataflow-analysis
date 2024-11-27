@@ -272,6 +272,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
     def from_lattice(
         cls,
         lattice: Lattice[L],
+        visible_vertices: set[L] | None = None,
         max_horizontal_size_per_vertex: int = 4,
         max_vertical_size: int = 10,
         labels: bool | dict = True,
@@ -282,6 +283,8 @@ class LatticeGraph(Generic[L], BetterDiGraph):
     ) -> LatticeGraph[L]:
         half_bottom_vertical_size = math.floor(max_vertical_size / 2)
         half_top_vertical_size = math.ceil(max_vertical_size / 2)
+        if visible_vertices is None:
+            visible_vertices = set()
 
         vertices: set[L | InfiniteNode[L] | IncompleteNode[L]] = set()
         bottom_infinite_vertices: dict[InfiniteNode[L], list[L]] = {}
@@ -313,17 +316,40 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                 incomplete_vertices = top_incomplete_vertices
                 half_vertical_size = half_top_vertical_size
                 infinite_vertices = top_infinite_vertices
+                children_iterable = lattice.predecessors(vertex)
+                filtered_visible_vertices = tuple(
+                    visible_vertex
+                    for visible_vertex in visible_vertices
+                    if lattice.is_predecessor(vertex, visible_vertex)
+                )
             else:
                 incomplete_vertices = bottom_incomplete_vertices
                 half_vertical_size = half_bottom_vertical_size
                 infinite_vertices = bottom_infinite_vertices
+                children_iterable = lattice.successors(vertex)
+                filtered_visible_vertices = tuple(
+                    visible_vertex
+                    for visible_vertex in visible_vertices
+                    if lattice.is_successor(vertex, visible_vertex)
+                )
 
-            children, is_finished = cls._get_children(
-                lattice,
+            children, is_finished = cls._take_max_horizontal_size(
+                children_iterable,
                 max_horizontal_size_per_vertex,
-                vertex,
-                invert_direction,
             )
+
+            if filtered_visible_vertices:
+                visible_vertices.difference_update(filtered_visible_vertices)
+                children.update(filtered_visible_vertices)
+
+                if invert_direction:
+                    is_finished = not lattice.has_other_predecessors_than(
+                        vertex, *children
+                    )
+                else:
+                    is_finished = not lattice.has_other_successors_than(
+                        vertex, *children
+                    )
 
             cls._create_incomplete_vertex(
                 lattice,
@@ -452,23 +478,6 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             is_finished = next(iterator, None) is None
 
         return children, is_finished
-
-    @classmethod
-    def _get_children(
-        cls,
-        lattice: Lattice[L],
-        max_horizontal_size_per_vertex: int,
-        vertex: L,
-        invert_direction: bool,
-    ) -> tuple[set[L], bool]:
-        if invert_direction:
-            return cls._take_max_horizontal_size(
-                lattice.predecessors(vertex), max_horizontal_size_per_vertex
-            )
-        else:
-            return cls._take_max_horizontal_size(
-                lattice.successors(vertex), max_horizontal_size_per_vertex
-            )
 
     @classmethod
     def _create_incomplete_vertex(
