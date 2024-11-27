@@ -425,7 +425,12 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             bottom_infinite_vertices,
             vertices,
             edges,
-            unprocessed_visible_vertices,
+            sorted(
+                unprocessed_visible_vertices,
+                key=lambda visible_vertex: lattice.path_length(
+                    lattice.bottom(), visible_vertex
+                ),
+            ),
             False,
         )
 
@@ -434,7 +439,12 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             top_infinite_vertices,
             vertices,
             edges,
-            unprocessed_visible_vertices,
+            sorted(
+                unprocessed_visible_vertices,
+                key=lambda visible_vertex: lattice.path_length(
+                    visible_vertex, lattice.top()
+                ),
+            ),
             True,
         )
 
@@ -653,39 +663,48 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                 L | InfiniteNode[L] | IncompleteNode[L],
             ]
         ],
-        unprocessed_visible_vertices: set[L],
+        sorted_unprocessed_visible_vertices: list[L],
         invert_direction: bool,
     ) -> None:
         for infinite_vertex, connections in infinite_vertices.items():
-            for visible_vertex in unprocessed_visible_vertices:
-                if invert_direction:
-                    included = lattice.includes(
-                        visible_vertex, infinite_vertex.base_node
-                    )
-                else:
-                    included = lattice.includes(
-                        infinite_vertex.base_node, visible_vertex
-                    )
-
-                if not included or infinite_vertex.base_node == visible_vertex:
-                    continue
-
-                infinite_visible_vertex = InfiniteNode(visible_vertex)
-
-                vertices.update(
-                    (
-                        visible_vertex,
-                        infinite_visible_vertex,
-                    )
+            if invert_direction:
+                unprocessed_visible_vertices = tuple(
+                    visible_vertex
+                    for visible_vertex in sorted_unprocessed_visible_vertices
+                    if lattice.includes(visible_vertex, infinite_vertex.base_node)
+                    and visible_vertex != infinite_vertex.base_node
+                )
+            else:
+                unprocessed_visible_vertices = tuple(
+                    visible_vertex
+                    for visible_vertex in sorted_unprocessed_visible_vertices
+                    if lattice.includes(infinite_vertex.base_node, visible_vertex)
+                    and visible_vertex != infinite_vertex.base_node
                 )
 
+            vertices.update(unprocessed_visible_vertices)
+
+            for visible_vertex in unprocessed_visible_vertices:
+                infinite_visible_vertex = InfiniteNode(visible_vertex)
+
+                vertices.add(infinite_visible_vertex)
+
                 if invert_direction:
-                    edges.update(
-                        (
-                            (infinite_vertex, visible_vertex),
-                            (visible_vertex, infinite_visible_vertex),
-                        )
+                    predecessor_visible_vertices = tuple(
+                        predecessor
+                        for predecessor in unprocessed_visible_vertices
+                        if lattice.is_predecessor(visible_vertex, predecessor)
                     )
+
+                    edges.add((visible_vertex, infinite_visible_vertex))
+
+                    for predecessor_visible_vertex in predecessor_visible_vertices:
+                        edges.add((predecessor_visible_vertex, visible_vertex))
+
+                    if lattice.has_other_predecessors_than(
+                        visible_vertex, *predecessor_visible_vertices
+                    ):
+                        edges.add((infinite_vertex, visible_vertex))
 
                     visible_vertex_connections = set(
                         connection
@@ -693,12 +712,21 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                         if lattice.includes(connection, visible_vertex)
                     )
                 else:
-                    edges.update(
-                        (
-                            (infinite_visible_vertex, visible_vertex),
-                            (visible_vertex, infinite_vertex),
-                        )
+                    successor_visible_vertices = tuple(
+                        successor
+                        for successor in unprocessed_visible_vertices
+                        if lattice.is_successor(visible_vertex, successor)
                     )
+
+                    edges.add((infinite_visible_vertex, visible_vertex))
+
+                    for successor_visible_vertex in successor_visible_vertices:
+                        edges.add((visible_vertex, successor_visible_vertex))
+
+                    if lattice.has_other_successors_than(
+                        visible_vertex, *successor_visible_vertices
+                    ):
+                        edges.add((visible_vertex, infinite_vertex))
 
                     visible_vertex_connections = set(
                         connection
