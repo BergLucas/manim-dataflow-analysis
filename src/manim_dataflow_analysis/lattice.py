@@ -99,6 +99,9 @@ class Lattice(Protocol[L]):
     def includes(self, including: L, included: L) -> bool:
         return including == included or self.is_ancestor(including, included)
 
+    def reverse_includes(self, including: L, included: L) -> bool:
+        return including == included or self.is_descendant(including, included)
+
     def join(self, value1: L, value2: L) -> L:
         return self.__join_distance(value1, value2)[0]
 
