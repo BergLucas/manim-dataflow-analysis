@@ -412,20 +412,20 @@ class LatticeGraph(Generic[L], BetterDiGraph):
 
         cls._add_unprocessed_vertices(
             lattice,
-            top_infinite_vertices,
-            vertices,
-            edges,
-            unprocessed_visible_vertices,
-            True,
-        )
-
-        cls._add_unprocessed_vertices(
-            lattice,
             bottom_infinite_vertices,
             vertices,
             edges,
             unprocessed_visible_vertices,
             False,
+        )
+
+        cls._add_unprocessed_vertices(
+            lattice,
+            top_infinite_vertices,
+            vertices,
+            edges,
+            unprocessed_visible_vertices,
+            True,
         )
 
         cls._create_infinite_edges(
