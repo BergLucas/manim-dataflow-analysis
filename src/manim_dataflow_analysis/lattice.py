@@ -48,7 +48,10 @@ class Lattice(Protocol[L]):
         )
 
     def has_other_successors_than(self, value: L, *successors: L) -> bool:
-        return any(successor not in successors for successor in self.successors(value))
+        return any(
+            value_successor not in successors
+            for value_successor in self.successors(value)
+        )
 
     def nearest_ancestor(self, value1: L, value2: L) -> L: ...
 
@@ -62,7 +65,8 @@ class Lattice(Protocol[L]):
 
     def has_other_predecessors_than(self, value: L, *successors: L) -> bool:
         return any(
-            successor not in successors for successor in self.predecessors(value)
+            value_successor not in successors
+            for value_successor in self.predecessors(value)
         )
 
     def includes(self, including: L, included: L) -> bool: ...
