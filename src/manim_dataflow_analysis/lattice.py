@@ -542,12 +542,18 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             True,
         )
 
-        for bottom_infinite_vertex in bottom_infinite_vertices:
-            for top_infinite_vertex in top_infinite_vertices:
-                if lattice.includes(
-                    top_infinite_vertex.base_node, bottom_infinite_vertex.base_node
-                ):
-                    edges.add((bottom_infinite_vertex, top_infinite_vertex))
+        final_visible_vertices = set(
+            vertex for vertex in unprocessed_visible_vertices if vertex not in vertices
+        )
+
+        cls._bridge_infinite_vertices(
+            lattice,
+            bottom_infinite_vertices,
+            top_infinite_vertices,
+            vertices,
+            edges,
+            final_visible_vertices,
+        )
 
         if isinstance(labels, bool) and labels:
             labels = {}
@@ -903,6 +909,94 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                     vertices.add(infinite_vertex)
                     edges.add((incomplete_vertex, infinite_vertex))
                     infinite_vertices[infinite_vertex] = {lattice.bottom()}
+
+    @classmethod
+    def _bridge_infinite_vertices(
+        cls,
+        lattice: Lattice[L],
+        bottom_infinite_vertices: dict[InfiniteNode[L], set[L]],
+        top_infinite_vertices: dict[InfiniteNode[L], set[L]],
+        vertices: set[L | InfiniteNode[L] | IncompleteNode[L]],
+        edges: set[
+            tuple[
+                L | InfiniteNode[L] | IncompleteNode[L],
+                L | InfiniteNode[L] | IncompleteNode[L],
+            ]
+        ],
+        final_visible_vertices: set[L],
+    ) -> None:
+        vertices_connections: dict[L | InfiniteNode[L], set[L | InfiniteNode[L]]] = (
+            defaultdict(set)
+        )
+
+        for bottom_infinite_vertex in bottom_infinite_vertices:
+            for top_infinite_vertex in top_infinite_vertices:
+                if lattice.includes(
+                    top_infinite_vertex.base_node, bottom_infinite_vertex.base_node
+                ):
+                    vertices_connections[top_infinite_vertex].add(
+                        bottom_infinite_vertex
+                    )
+
+        for visible_vertex in final_visible_vertices:
+            vertices.add(visible_vertex)
+
+            visible_vertex_connections = set()
+
+            for vertex, connections in vertices_connections.items():
+                if isinstance(vertex, InfiniteNode):
+                    visible_vertex_included = lattice.is_descendant(
+                        visible_vertex, vertex.base_node
+                    )
+                else:
+                    visible_vertex_included = lattice.is_descendant(
+                        visible_vertex, vertex
+                    )
+
+                if not visible_vertex_included:
+                    continue
+
+                connections.add(visible_vertex)
+
+                for connection in connections.copy():
+                    if isinstance(connection, InfiniteNode):
+                        connection_included = lattice.is_descendant(
+                            connection.base_node, visible_vertex
+                        )
+                    else:
+                        connection_included = lattice.is_descendant(
+                            connection, visible_vertex
+                        )
+
+                    if not connection_included:
+                        continue
+
+                    visible_vertex_connections.add(connection)
+
+                    if not any(
+                        isinstance(end, IncompleteNode) for _, end in edges
+                    ) and lattice.contains(visible_vertex, connection):
+                        connections.remove(connection)
+
+            vertices_connections[visible_vertex] = visible_vertex_connections
+
+        for vertex, connections in vertices_connections.items():
+            for connection in connections:
+                if (
+                    isinstance(vertex, InfiniteNode)
+                    or isinstance(connection, InfiniteNode)
+                    or lattice.is_successor(connection, vertex)
+                ):
+                    edges.add((connection, vertex))
+                else:
+                    infinite_vertex = InfiniteNode(connection)
+                    vertices.add(infinite_vertex)
+                    edges.update(
+                        (
+                            (connection, infinite_vertex),
+                            (infinite_vertex, vertex),
+                        )
+                    )
 
     def __init__(
         self,
