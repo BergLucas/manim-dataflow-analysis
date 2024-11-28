@@ -62,11 +62,6 @@ class Lattice(Protocol[L]):
             for value_descendant in self.descendants(value)
         )
 
-    def is_descendant_of_all_successors(self, value: L, descendant: L) -> bool:
-        return all(
-            self.is_descendant(child, descendant) for child in self.successors(value)
-        )
-
     def predecessors(self, value: L) -> Iterable[L]: ...
 
     def is_predecessor(self, value: L, predecessor: L) -> bool:
@@ -91,16 +86,23 @@ class Lattice(Protocol[L]):
             ancestor == value_ancestor for value_ancestor in self.ancestors(value)
         )
 
-    def is_ancestor_of_all_predecessors(self, value: L, ancestor: L) -> bool:
+    def contains(self, containing: L, contained: L) -> bool:
         return all(
-            self.is_ancestor(parent, ancestor) for parent in self.predecessors(value)
+            self.is_descendant(successor, containing)
+            for successor in self.successors(contained)
+        )
+
+    def reverse_contains(self, containing: L, contained: L) -> bool:
+        return all(
+            self.is_ancestor(predecessor, containing)
+            for predecessor in self.predecessors(contained)
         )
 
     def includes(self, including: L, included: L) -> bool:
-        return including == included or self.is_ancestor(including, included)
+        return including == included or self.is_descendant(included, including)
 
     def reverse_includes(self, including: L, included: L) -> bool:
-        return including == included or self.is_descendant(including, included)
+        return including == included or self.is_ancestor(included, including)
 
     def join(self, value1: L, value2: L) -> L:
         return self.__join_distance(value1, value2)[0]
@@ -491,12 +493,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             bottom_infinite_vertices,
             vertices,
             edges,
-            sorted(
-                unprocessed_visible_vertices,
-                key=lambda visible_vertex: lattice.path_length(
-                    lattice.bottom(), visible_vertex
-                ),
-            ),
+            unprocessed_visible_vertices,
             False,
         )
 
@@ -505,12 +502,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             top_infinite_vertices,
             vertices,
             edges,
-            sorted(
-                unprocessed_visible_vertices,
-                key=lambda visible_vertex: lattice.path_length(
-                    visible_vertex, lattice.top()
-                ),
-            ),
+            unprocessed_visible_vertices,
             True,
         )
 
@@ -655,9 +647,9 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                 if closest_connection == lattice.top():
                     continue
 
-            connections = infinite_vertices.pop(infinite_vertex)
-            connections.add(vertex)
-            infinite_vertices[InfiniteNode(closest_connection)] = connections
+            infinite_connections = infinite_vertices.pop(infinite_vertex)
+            infinite_connections.add(vertex)
+            infinite_vertices[InfiniteNode(closest_connection)] = infinite_connections
             break
         else:
             infinite_vertices[InfiniteNode(vertex)] = {vertex}
@@ -725,84 +717,104 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                 L | InfiniteNode[L] | IncompleteNode[L],
             ]
         ],
-        sorted_unprocessed_visible_vertices: list[L],
+        unprocessed_visible_vertices: list[L],
         invert_direction: bool,
     ) -> None:
-        for infinite_vertex, connections in infinite_vertices.items():
+        for infinite_vertex, infinite_connections in infinite_vertices.items():
             if invert_direction:
-                unprocessed_visible_vertices = tuple(
+                filtered_visible_vertices = tuple(
                     visible_vertex
-                    for visible_vertex in sorted_unprocessed_visible_vertices
-                    if lattice.includes(visible_vertex, infinite_vertex.base_node)
-                    and visible_vertex != infinite_vertex.base_node
+                    for visible_vertex in unprocessed_visible_vertices
+                    if lattice.is_ancestor(visible_vertex, infinite_vertex.base_node)
                 )
             else:
-                unprocessed_visible_vertices = tuple(
+                filtered_visible_vertices = tuple(
                     visible_vertex
-                    for visible_vertex in sorted_unprocessed_visible_vertices
-                    if lattice.includes(infinite_vertex.base_node, visible_vertex)
-                    and visible_vertex != infinite_vertex.base_node
+                    for visible_vertex in unprocessed_visible_vertices
+                    if lattice.is_descendant(visible_vertex, infinite_vertex.base_node)
                 )
 
-            vertices.update(unprocessed_visible_vertices)
+            if not filtered_visible_vertices:
+                continue
 
-            for visible_vertex in unprocessed_visible_vertices:
-                infinite_visible_vertex = InfiniteNode(visible_vertex)
+            vertices_connections = {
+                infinite_vertex.base_node: infinite_connections,
+            }
 
-                vertices.add(infinite_visible_vertex)
+            for visible_vertex in filtered_visible_vertices:
+                visible_vertex_connections = set()
 
-                if invert_direction:
-                    predecessor_visible_vertices = set(
-                        predecessor
-                        for predecessor in unprocessed_visible_vertices
-                        if lattice.is_predecessor(visible_vertex, predecessor)
-                    )
-
-                    edges.add((visible_vertex, infinite_visible_vertex))
-
-                    for predecessor_visible_vertex in predecessor_visible_vertices:
-                        edges.add((predecessor_visible_vertex, visible_vertex))
-
-                    if lattice.has_other_predecessors_than(
-                        visible_vertex, predecessor_visible_vertices
-                    ):
-                        edges.add((infinite_vertex, visible_vertex))
-
-                    visible_vertex_connections = set(
-                        connection
-                        for connection in connections
-                        if lattice.includes(connection, visible_vertex)
-                    )
-                else:
-                    successor_visible_vertices = set(
-                        successor
-                        for successor in unprocessed_visible_vertices
-                        if lattice.is_successor(visible_vertex, successor)
-                    )
-
-                    edges.add((infinite_visible_vertex, visible_vertex))
-
-                    for successor_visible_vertex in successor_visible_vertices:
-                        edges.add((visible_vertex, successor_visible_vertex))
-
-                    if lattice.has_other_successors_than(
-                        visible_vertex, successor_visible_vertices
-                    ):
-                        edges.add((visible_vertex, infinite_vertex))
-
-                    visible_vertex_connections = set(
-                        connection
-                        for connection in connections
-                        if lattice.includes(visible_vertex, connection)
-                    )
-
-                connections.difference_update(visible_vertex_connections)
-
-                for visible_vertex_connection in visible_vertex_connections:
+                for vertex, connections in vertices_connections.items():
                     if invert_direction:
-                        edges.add((infinite_visible_vertex, visible_vertex_connection))
+                        visible_vertex_included = lattice.is_ancestor(
+                            visible_vertex, vertex
+                        )
                     else:
-                        edges.add((visible_vertex_connection, infinite_visible_vertex))
+                        visible_vertex_included = lattice.is_descendant(
+                            visible_vertex, vertex
+                        )
+
+                    if not visible_vertex_included:
+                        continue
+
+                    connections.add(visible_vertex)
+
+                    for connection in connections.copy():
+                        if invert_direction:
+                            connection_included = lattice.is_ancestor(
+                                connection, visible_vertex
+                            )
+                        else:
+                            connection_included = lattice.is_descendant(
+                                connection, visible_vertex
+                            )
+
+                        if not connection_included:
+                            continue
+
+                        visible_vertex_connections.add(connection)
+
+                        if invert_direction:
+                            connection_contained = lattice.reverse_contains(
+                                visible_vertex, connection
+                            )
+                        else:
+                            connection_contained = lattice.contains(
+                                visible_vertex, connection
+                            )
+
+                        if connection_contained:
+                            connections.remove(connection)
+
+                vertices_connections[visible_vertex] = visible_vertex_connections
+
+            for visible_vertex in filtered_visible_vertices:
+                vertices.add(visible_vertex)
+                for connection in vertices_connections[visible_vertex]:
+                    if invert_direction:
+                        if lattice.is_predecessor(visible_vertex, connection):
+                            edges.add((visible_vertex, connection))
+                        else:
+                            infinite_vertex = InfiniteNode(connection)
+                            vertices.add(infinite_vertex)
+                            edges.update(
+                                (
+                                    (visible_vertex, infinite_vertex),
+                                    (infinite_vertex, connection),
+                                )
+                            )
+                    else:
+                        if lattice.is_successor(connection, visible_vertex):
+                            edges.add((connection, visible_vertex))
+                        else:
+                            infinite_vertex = InfiniteNode(connection)
+                            vertices.add(infinite_vertex)
+                            edges.update(
+                                (
+                                    (connection, infinite_vertex),
+                                    (infinite_vertex, visible_vertex),
+                                )
+                            )
 
     @classmethod
     def _create_infinite_edges(
@@ -819,7 +831,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         ],
         invert_direction: bool,
     ) -> None:
-        for infinite_vertex, connections in infinite_vertices.items():
+        for infinite_vertex, infinite_connections in infinite_vertices.items():
             vertices.add(infinite_vertex)
 
             incomplete_vertex = IncompleteNode(half_vertical_size - 2, invert_direction)
@@ -837,11 +849,11 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                     )
                 )
 
-            for connection in connections:
+            for infinite_connection in infinite_connections:
                 if invert_direction:
-                    edges.add((infinite_vertex, connection))
+                    edges.add((infinite_vertex, infinite_connection))
                 else:
-                    edges.add((connection, infinite_vertex))
+                    edges.add((infinite_connection, infinite_vertex))
 
     @classmethod
     def _create_incomplete_edges(
@@ -858,11 +870,14 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         ],
         invert_direction: bool,
     ) -> None:
-        for incomplete_vertex, connections in incomplete_vertices.items():
+        for incomplete_vertex, infinite_connections in incomplete_vertices.items():
             vertices.add(incomplete_vertex)
 
             if invert_direction:
-                for connection_vertex, connection_invert_direction in connections:
+                for (
+                    connection_vertex,
+                    connection_invert_direction,
+                ) in infinite_connections:
                     if connection_invert_direction:
                         edges.add((connection_vertex, incomplete_vertex))
                     else:
@@ -874,7 +889,10 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                     edges.add((infinite_vertex, incomplete_vertex))
                     infinite_vertices[infinite_vertex] = {lattice.top()}
             else:
-                for connection_vertex, connection_invert_direction in connections:
+                for (
+                    connection_vertex,
+                    connection_invert_direction,
+                ) in infinite_connections:
                     if connection_invert_direction:
                         edges.add((incomplete_vertex, connection_vertex))
                     else:
