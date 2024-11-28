@@ -13,6 +13,7 @@ from manim.mobject.geometry.line import Arrow
 from manim.mobject.text.code_mobject import Code
 from manim.mobject.text.text_mobject import Text
 from manim.animation.creation import Create, Uncreate, Write, Unwrite
+from manim.animation.transform import FadeTransform
 from manim.constants import LEFT, RIGHT, DOWN
 import networkx as nx
 import numpy as np
@@ -33,6 +34,10 @@ class AbstractAnalysisScene(ABC, Scene, Generic[L, E]):
     cfg_wait_time: int = 5
 
     lattice_wait_time: int = 5
+
+    lattice_transform_wait_time: int = 2.5
+
+    lattice_join_wait_time: int = 5
 
     sorting_function = default_sorting_function
 
@@ -147,7 +152,7 @@ class AbstractAnalysisScene(ABC, Scene, Generic[L, E]):
 
         return entry_point, program_cfg, cfg
 
-    def show_lattice(
+    def create_lattice_graph(
         self,
         position: tuple[int, int, int] = (0, 0, 0),
         scale: float = 0.25,
@@ -155,7 +160,7 @@ class AbstractAnalysisScene(ABC, Scene, Generic[L, E]):
         max_horizontal_size_per_vertex: int = 8,
         max_vertical_size: int = 8,
     ) -> LatticeGraph[L]:
-        lattice = LatticeGraph.from_lattice(
+        lattice_graph = LatticeGraph.from_lattice(
             self.lattice,
             visible_vertices=visible_vertices,
             max_horizontal_size_per_vertex=max_horizontal_size_per_vertex,
@@ -163,14 +168,69 @@ class AbstractAnalysisScene(ABC, Scene, Generic[L, E]):
             layout_config=dict(sorting_function=type(self).sorting_function),
         )
 
-        lattice.move_to(position)
-        lattice.scale(scale)
+        lattice_graph.move_to(position)
+        lattice_graph.scale(scale)
 
-        self.play(Create(lattice))
+        return lattice_graph
+
+    def show_lattice_graph(
+        self,
+        position: tuple[int, int, int] = (0, 0, 0),
+        scale: float = 0.25,
+        visible_vertices: set[L] | None = None,
+        max_horizontal_size_per_vertex: int = 8,
+        max_vertical_size: int = 8,
+    ) -> LatticeGraph[L]:
+        lattice_graph = self.create_lattice_graph(
+            position=position,
+            scale=scale,
+            visible_vertices=visible_vertices,
+            max_horizontal_size_per_vertex=max_horizontal_size_per_vertex,
+            max_vertical_size=max_vertical_size,
+        )
+
+        self.play(Create(lattice_graph))
 
         self.wait(self.lattice_wait_time)
 
-        return lattice
+        return lattice_graph
+
+    def show_lattice_join(
+        self,
+        lattice_graph: LatticeGraph[L],
+        value1: L,
+        value2: L,
+        position: tuple[int, int, int] = (0, 0, 0),
+        scale: float = 0.25,
+        max_horizontal_size_per_vertex: int = 8,
+        max_vertical_size: int = 8,
+    ) -> LatticeGraph[L]:
+        joined_value = self.lattice.join(value1, value2)
+
+        visible_vertices = {
+            value1,
+            value2,
+            joined_value,
+        }
+
+        new_lattice_graph = self.create_lattice_graph(
+            position=position,
+            scale=scale,
+            visible_vertices=visible_vertices,
+            max_horizontal_size_per_vertex=max_horizontal_size_per_vertex,
+            max_vertical_size=max_vertical_size,
+        )
+
+        self.play(FadeTransform(lattice_graph, new_lattice_graph))
+
+        self.wait(self.lattice_transform_wait_time)
+
+        new_lattice_graph.color_path(value1, joined_value)
+        new_lattice_graph.color_path(value2, joined_value)
+
+        self.wait(self.lattice_join_wait_time)
+
+        return new_lattice_graph
 
     def construct(self):
         self.show_title()
@@ -183,4 +243,4 @@ class AbstractAnalysisScene(ABC, Scene, Generic[L, E]):
 
         self.clear()
 
-        lattice = self.show_lattice()
+        lattice_graph = self.show_lattice_graph()

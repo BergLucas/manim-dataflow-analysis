@@ -16,7 +16,7 @@ from manim.mobject.graph import LayoutName, LayoutFunction
 from manim.mobject.text.text_mobject import Text
 from manim.mobject.geometry.line import Line, DashedLine
 from manim.mobject.mobject import Mobject
-from manim.utils.color import BLACK
+from manim.utils.color import BLACK, WHITE, GREEN, ManimColor
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import total_ordering
@@ -1058,3 +1058,30 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             z_index=z_index,
             **edge_config,
         )
+
+    def color_path(
+        self,
+        start: Hashable,
+        end: Hashable,
+        color: ManimColor = GREEN,
+        text_color: ManimColor = WHITE,
+    ):
+        path = nx.shortest_path(self._graph, start, end)
+
+        for start, end in zip(path, path[1:]):
+            mobject = self.vertices[start]
+            edge_mobject = self.edges[(start, end)]
+
+            mobject.color = color
+            for submobject in mobject.submobjects:
+                submobject.color = text_color
+
+            edge_mobject.z_index = 1
+            edge_mobject.color = color
+            for submobject in edge_mobject.submobjects:
+                submobject.color = color
+
+        mobject = self.vertices[path[-1]]
+        mobject.color = color
+        for submobject in mobject.submobjects:
+            submobject.color = text_color
