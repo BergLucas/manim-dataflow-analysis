@@ -12,6 +12,9 @@ class ControlFlowFunction(Protocol[L]):
     def condition_tex(self) -> MathTex: ...
 
     @abstractmethod
+    def modification_tex(self) -> MathTex: ...
+
+    @abstractmethod
     def apply(
         self,
         abstract_environment: AbstractEnvironment,
