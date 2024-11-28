@@ -17,9 +17,10 @@ from manim.mobject.text.text_mobject import Text
 from manim.mobject.geometry.line import Line, DashedLine
 from manim.mobject.mobject import Mobject
 from manim.utils.color import BLACK, WHITE, GREEN, ManimColor
+from functools import total_ordering
 from collections import defaultdict
 from dataclasses import dataclass
-from functools import total_ordering
+from abc import abstractmethod
 import networkx as nx
 import numpy as np
 import math
@@ -34,10 +35,13 @@ L = TypeVar("L")
 
 
 class Lattice(Protocol[L]):
+    @abstractmethod
     def top(self) -> L: ...
 
+    @abstractmethod
     def bottom(self) -> L: ...
 
+    @abstractmethod
     def successors(self, value: L) -> Iterable[L]: ...
 
     def is_successor(self, value: L, successor: L) -> bool:
@@ -62,6 +66,7 @@ class Lattice(Protocol[L]):
             for value_descendant in self.descendants(value)
         )
 
+    @abstractmethod
     def predecessors(self, value: L) -> Iterable[L]: ...
 
     def is_predecessor(self, value: L, predecessor: L) -> bool:
