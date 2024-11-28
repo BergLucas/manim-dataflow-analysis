@@ -156,14 +156,6 @@ class Lattice(Protocol[L]):
 
         return closest_met_value, min_distance + 1.0
 
-    def path(self, start: L, end: L) -> Iterable[L]: ...
-
-    def path_length(self, start: L, end: L) -> float:
-        return sum(
-            (1.0 for _ in self.path(start, end)),
-            start=0.0,
-        )
-
 
 class FiniteSizeLattice(Lattice[L]):
 
@@ -231,9 +223,6 @@ class FiniteSizeLattice(Lattice[L]):
             met_value = self.bottom()
 
         return met_value
-
-    def path(self, start: L, end: L) -> Iterable[L]:
-        return nx.shortest_path(self.__graph, start, end)
 
 
 def __get_vertices_heights(
