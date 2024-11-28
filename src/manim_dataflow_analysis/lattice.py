@@ -307,8 +307,6 @@ class InfiniteNode(Generic[L]):
     def __lt__(self, other: Any) -> bool:
         if isinstance(other, InfiniteNode):
             return self.base_node < other.base_node
-        elif isinstance(other, IncompleteNode):
-            return False
         else:
             return False
 
@@ -328,10 +326,27 @@ class IncompleteNode(Generic[L]):
                 self.invert_direction == other.invert_direction
                 and self.depth < other.depth
             )
-        elif isinstance(other, InfiniteNode):
-            return True
         else:
-            return False
+            return isinstance(other, InfiniteNode)
+
+
+@total_ordering
+@dataclass(frozen=True, order=False)
+class BridgeNode(Generic[L]):
+    bottom_vertex: InfiniteNode[L]
+    top_vertex: InfiniteNode[L]
+
+    def __str__(self) -> str:
+        return "..."
+
+    def __lt__(self, other: Any) -> bool:
+        if isinstance(other, BridgeNode):
+            return self.bottom_vertex < other.bottom_vertex or (
+                self.bottom_vertex == other.bottom_vertex
+                and self.top_vertex < other.top_vertex
+            )
+        else:
+            return isinstance(other, (InfiniteNode, IncompleteNode))
 
 
 class LatticeGraph(Generic[L], BetterDiGraph):
@@ -918,6 +933,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             defaultdict(set)
         )
 
+        bridge_vertices: set[tuple[InfiniteNode[L], InfiniteNode[L]]] = set()
         for bottom_infinite_vertex in bottom_infinite_vertices:
             for top_infinite_vertex in top_infinite_vertices:
                 if lattice.includes(
@@ -926,6 +942,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                     vertices_connections[top_infinite_vertex].add(
                         bottom_infinite_vertex
                     )
+                    bridge_vertices.add((bottom_infinite_vertex, top_infinite_vertex))
 
         for visible_vertex in final_visible_vertices:
             vertices.add(visible_vertex)
@@ -977,7 +994,16 @@ class LatticeGraph(Generic[L], BetterDiGraph):
 
         for vertex, connections in vertices_connections.items():
             for connection in connections:
-                if (
+                if final_visible_vertices and (connection, vertex) in bridge_vertices:
+                    bridge_vertex = BridgeNode(connection, vertex)
+                    vertices.add(bridge_vertex)
+                    edges.update(
+                        (
+                            (connection, bridge_vertex),
+                            (bridge_vertex, vertex),
+                        )
+                    )
+                elif (
                     isinstance(vertex, InfiniteNode)
                     or isinstance(connection, InfiniteNode)
                     or lattice.is_successor(connection, vertex)
