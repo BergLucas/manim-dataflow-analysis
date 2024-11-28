@@ -11,6 +11,7 @@ python = ">=3.9,<3.13"
 manim = "^0.18.1"
 networkx = ">=2.6"
 types-networkx = ">=2.6"
+frozendict = "^2.4.6"
 
 
 [build-system]

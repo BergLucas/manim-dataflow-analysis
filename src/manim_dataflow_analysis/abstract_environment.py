@@ -2,52 +2,48 @@ from __future__ import annotations
 
 from typing import TypeVar, Generic
 from manim_dataflow_analysis.lattice import Lattice
+from dataclasses import dataclass
+from frozendict import frozendict
 
 
 L = TypeVar("L")
 
 
+@dataclass(frozen=True)
 class AbstractEnvironment(Generic[L]):
 
-    def __init__(self, lattice: Lattice[L], **variables: L) -> None:
-        self.__lattice = lattice
-        self.__variables = variables
+    lattice: Lattice[L]
+    variables: frozendict[str, L]
 
     def join(self, other: AbstractEnvironment[L]) -> AbstractEnvironment[L]:
-        joined_variables: dict[str, L] = {}
-
-        for variable in self.__variables | other.__variables:
-            self_abstract_value = self.__variables.get(variable)
-            other_abstract_value = other.__variables.get(variable)
-
-            if self_abstract_value is None:
-                joined_variables[variable] = other_abstract_value
-            elif other_abstract_value is None:
-                joined_variables[variable] = self_abstract_value
-            else:
-                joined_variables[variable] = self.__lattice.join(
-                    self_abstract_value, other_abstract_value
+        return AbstractEnvironment(
+            self.lattice,
+            frozendict(
+                (
+                    variable,
+                    self.lattice.join(
+                        self.variables.get(variable, self.lattice.bottom()),
+                        other.variables.get(variable, self.lattice.bottom()),
+                    ),
                 )
-
-        return AbstractEnvironment(self.__lattice, **joined_variables)
+                for variable in self.variables | other.variables
+            ),
+        )
 
     def includes(self, other: AbstractEnvironment[L]) -> bool:
-        for variable in self.__variables | other.__variables:
-            self_abstract_value = self.__variables.get(variable)
-            other_abstract_value = other.__variables.get(variable)
+        for variable in self.variables | other.variables:
+            self_abstract_value = self.variables.get(variable)
+            other_abstract_value = other.variables.get(variable)
 
             if self_abstract_value is None or (
                 other_abstract_value is not None
-                and not self.__lattice.includes(
-                    self_abstract_value, other_abstract_value
-                )
+                and not self.lattice.includes(self_abstract_value, other_abstract_value)
             ):
                 return False
 
         return True
 
     def set(self, **variables: L) -> AbstractEnvironment[L]:
-        return AbstractEnvironment(self.__lattice, **self.__variables, **variables)
-
-    def get(self, variable: str) -> L | None:
-        return self.__variables.get(variable)
+        return AbstractEnvironment(
+            self.lattice, frozendict(**self.variables, **variables)
+        )
