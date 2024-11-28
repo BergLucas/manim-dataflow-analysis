@@ -957,14 +957,20 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                             connection, visible_vertex
                         )
 
-                    if not connection_included:
+                    connected_to_incomplete_vertex = any(
+                        isinstance(start, IncompleteNode)
+                        for start, end in edges
+                        if end == connection
+                    )
+
+                    if not connection_included and not connected_to_incomplete_vertex:
                         continue
 
                     visible_vertex_connections.add(connection)
 
-                    if not any(
-                        isinstance(end, IncompleteNode) for _, end in edges
-                    ) and lattice.contains(visible_vertex, connection):
+                    if not connected_to_incomplete_vertex and lattice.contains(
+                        visible_vertex, connection
+                    ):
                         connections.remove(connection)
 
             vertices_connections[visible_vertex] = visible_vertex_connections
