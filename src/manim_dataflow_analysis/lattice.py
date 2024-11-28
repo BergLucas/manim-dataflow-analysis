@@ -488,7 +488,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             vertex for vertex in visible_vertices if vertex not in vertices
         )
 
-        cls._add_unprocessed_vertices(
+        cls._create_unprocessed_vertices(
             lattice,
             bottom_infinite_vertices,
             vertices,
@@ -497,7 +497,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             False,
         )
 
-        cls._add_unprocessed_vertices(
+        cls._create_unprocessed_vertices(
             lattice,
             top_infinite_vertices,
             vertices,
@@ -706,7 +706,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             )
 
     @classmethod
-    def _add_unprocessed_vertices(
+    def _create_unprocessed_vertices(
         cls,
         lattice: Lattice[L],
         infinite_vertices: dict[InfiniteNode[L], set[L]],
