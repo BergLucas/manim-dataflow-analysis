@@ -46,12 +46,10 @@ class AbstractEnvironment(Generic[L]):
         return True
 
     def set(self, **variables: L) -> AbstractEnvironment[L]:
-        return AbstractEnvironment(
-            self.lattice, frozendict(**self.variables, **variables)
-        )
+        return AbstractEnvironment(self.lattice, self.variables | variables)
 
-    def get(self, variable: str) -> L:
-        return self.variables.get(variable, self.lattice.bottom())
+    def __getitem__(self, variable: str) -> L:
+        return self.variables[variable]
 
 
 RULE_PART_INDEX = 1
