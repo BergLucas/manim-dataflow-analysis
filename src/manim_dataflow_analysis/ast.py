@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol
+from abc import abstractmethod
 import networkx as nx
 
 if TYPE_CHECKING:
@@ -11,6 +12,7 @@ class AstStatement(Protocol):
     """A statement in its AST form."""
 
     @property
+    @abstractmethod
     def header(self) -> str:
         """The header of the AST statement.
 
@@ -18,6 +20,7 @@ class AstStatement(Protocol):
             The header of the AST statement.
         """
 
+    @abstractmethod
     def __str__(self) -> str:
         """Convert the AST statement to its string form.
 
@@ -30,6 +33,7 @@ class AstProgram(Protocol):
     """A program in its AST form."""
 
     @property
+    @abstractmethod
     def language(self) -> str:
         """The language of the AST program.
 
@@ -38,13 +42,15 @@ class AstProgram(Protocol):
         """
 
     @property
+    @abstractmethod
     def variables(self) -> set[str]:
-        """Get the variables used in the AST program.
+        """Get the variable names used in the AST program.
 
         Returns:
-            The set of variables used in the AST program
+            The set of variable names used in the AST program.
         """
 
+    @abstractmethod
     def to_cfg(self) -> tuple[ProgramPoint, nx.DiGraph[ProgramPoint]]:
         """Convert the AST program to its control flow graph form.
 
@@ -52,6 +58,7 @@ class AstProgram(Protocol):
             A tuple containing the entry point and the CFG of the program.
         """
 
+    @abstractmethod
     def __str__(self) -> str:
         """Convert the AST program to its string form.
 
