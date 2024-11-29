@@ -37,6 +37,14 @@ class AstProgram(Protocol):
             The language of the AST program.
         """
 
+    @property
+    def variables(self) -> set[str]:
+        """Get the variables used in the AST program.
+
+        Returns:
+            The set of variables used in the AST program
+        """
+
     def to_cfg(self) -> tuple[ProgramPoint, nx.DiGraph[ProgramPoint]]:
         """Convert the AST program to its control flow graph form.
 
