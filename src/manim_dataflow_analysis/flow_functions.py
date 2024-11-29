@@ -14,8 +14,8 @@ class FlowFunctions(Protocol[L]):
     @abstractmethod
     def apply(
         self,
-        abstract_environment: AbstractEnvironment[L],
         statement: AstStatement,
+        abstract_environment: AbstractEnvironment[L],
     ) -> tuple[AbstractEnvironment[L], int]: ...
 
 
@@ -29,6 +29,6 @@ class ControlFlowFunctions(Protocol[L]):
     @abstractmethod
     def apply(
         self,
-        abstract_environment: AbstractEnvironment[L],
         program_point: ProgramPoint,
+        abstract_environment: AbstractEnvironment[L],
     ) -> tuple[AbstractEnvironment[L], int | tuple[int, int]]: ...
