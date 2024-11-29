@@ -6,7 +6,7 @@ from manim.mobject.mobject import Mobject
 from manim.mobject.graph import LayoutName, LayoutFunction
 from manim.utils.color import GREEN, RED, BLACK
 from manim_dataflow_analysis.graph import BetterDiGraph, LabeledRectangle
-from typing import TYPE_CHECKING, Hashable, Protocol, Any, cast
+from typing import TYPE_CHECKING, Hashable, Protocol, Any, cast, Iterable, TypeVar
 from collections import defaultdict
 from dataclasses import dataclass
 import networkx as nx
@@ -510,3 +510,26 @@ class ControlFlowGraph(BetterDiGraph):
     def focus_vertex_at(self, vertex: Hashable, point: Point3D) -> ControlFlowGraph:
         self.shift(point - self.get_center() - self[vertex].get_center())
         return self
+
+
+def succ(
+    graph: nx.DiGraph[ProgramPoint], program_point: ProgramPoint
+) -> Iterable[ProgramPoint]:
+    return graph.successors(program_point)
+
+
+def pred(
+    graph: nx.DiGraph[ProgramPoint], program_point: ProgramPoint
+) -> Iterable[ProgramPoint]:
+    return graph.predecessors(program_point)
+
+
+E = TypeVar("E")
+
+
+def cond(
+    graph: nx.DiGraph[ProgramPoint],
+    start_program_point: ProgramPoint,
+    end_program_point: ProgramPoint,
+) -> E:
+    return graph.get_edge_data(start_program_point, end_program_point)["condition"]
