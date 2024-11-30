@@ -72,21 +72,29 @@ EMPTY_CHARACTER = r"\hspace{0pt}"
 
 class AbstractEnvironmentUpdateRules(MathTex, Generic[L]):
 
-    def __init__(self, updates_rules: Iterable[tuple[str, str, str]]) -> None:
+    def __init__(self, updates_rules: Iterable[tuple[str, str, str | None]]) -> None:
         tex_strings: list[str] = []
 
         for rule_tex, modification_tex, condition_tex in updates_rules:
             tex_strings.extend(
                 (
-                    "&",
+                    r"&",
                     rule_tex,
-                    r"& = & \quad" if rule_tex else "& &",
+                    r"& = & \quad",
                     modification_tex,
-                    "& &",
-                    "if" if condition_tex else "otherwise",
-                    "&",
-                    condition_tex if condition_tex else EMPTY_CHARACTER,
-                    "&",
+                    r"& &",
+                    (
+                        EMPTY_CHARACTER
+                        if condition_tex is None
+                        else r"if" if condition_tex else r"otherwise"
+                    ),
+                    r"&",
+                    (
+                        EMPTY_CHARACTER
+                        if condition_tex is None or not condition_tex
+                        else condition_tex
+                    ),
+                    r"&",
                     r"\\",
                 )
             )
@@ -96,16 +104,30 @@ class AbstractEnvironmentUpdateRules(MathTex, Generic[L]):
     def get_rule_part(self, index: int) -> VMobject:
         return self.submobjects[index * LINE_LENGTH + RULE_PART_INDEX]
 
-    def get_condition_part(self, index: int) -> VMobject:
+    def get_condition_part(self, index: int) -> VMobject | None:
         if_otherwise = self.submobjects[index * LINE_LENGTH + IF_OTHERWISE_INDEX]
         condition_part = self.submobjects[index * LINE_LENGTH + CONDITION_PART_INDEX]
 
+        assert isinstance(if_otherwise, SingleStringMathTex)
         assert isinstance(condition_part, SingleStringMathTex)
 
-        if condition_part.get_tex_string() == EMPTY_CHARACTER:
+        if (
+            condition_part.get_tex_string() != EMPTY_CHARACTER
+            and if_otherwise.get_tex_string() != EMPTY_CHARACTER
+        ):
+            return VGroup(if_otherwise, condition_part)
+        elif (
+            condition_part.get_tex_string() != EMPTY_CHARACTER
+            and if_otherwise.get_tex_string() == EMPTY_CHARACTER
+        ):
+            return condition_part
+        elif (
+            condition_part.get_tex_string() == EMPTY_CHARACTER
+            and if_otherwise.get_tex_string() != EMPTY_CHARACTER
+        ):
             return if_otherwise
-
-        return VGroup(if_otherwise, condition_part)
+        else:
+            return None
 
     def get_modification_part(self, index: int) -> VMobject:
         return self.submobjects[index * LINE_LENGTH + MODIFICATION_PART_INDEX]
