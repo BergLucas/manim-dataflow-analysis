@@ -22,7 +22,7 @@ class AbstractEnvironment(Generic[L]):
     ) -> Generator[tuple[str, L], None, None]:
         for variable in self.variables | other.variables:
             self_abstract_value = self.variables.get(variable)
-            other_abstract_value = self.variables.get(variable)
+            other_abstract_value = other.variables.get(variable)
 
             if self_abstract_value is None:
                 yield variable, other_abstract_value
@@ -44,7 +44,7 @@ class AbstractEnvironment(Generic[L]):
     ) -> Generator[tuple[str, bool], None, None]:
         for variable in self.variables | other.variables:
             self_abstract_value = self.variables.get(variable)
-            other_abstract_value = self.variables.get(variable)
+            other_abstract_value = other.variables.get(variable)
 
             yield variable, self_abstract_value is None or (
                 other_abstract_value is not None
