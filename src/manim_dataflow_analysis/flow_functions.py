@@ -10,7 +10,7 @@ L = TypeVar("L")
 class FlowFunctions(Protocol[L]):
     @property
     @abstractmethod
-    def rules(self) -> Sequence[tuple[str, str, str]]: ...
+    def rules(self) -> Sequence[tuple[str, str, str | None]]: ...
 
     @abstractmethod
     def apply(
@@ -23,7 +23,7 @@ class FlowFunctions(Protocol[L]):
 class ControlFlowFunctions(Protocol[L]):
     @property
     @abstractmethod
-    def rules(self) -> Sequence[tuple[str, str, str]]: ...
+    def rules(self) -> Sequence[tuple[str, str, str | None]]: ...
 
     @property
     @abstractmethod
