@@ -1,6 +1,5 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
-from typing import TypeVar, Generic, Hashable, Collection
+from typing import TypeVar, Generic, Hashable, Collection, Iterable, Callable
 from manim.scene.scene import Scene
 from manim_dataflow_analysis.ast import AstProgram
 from manim_dataflow_analysis.cfg import ControlFlowGraph, ProgramPoint, succ, cond
@@ -32,7 +31,7 @@ L = TypeVar("L", bound=Hashable)
 E = TypeVar("E", bound=Hashable)
 
 
-class AbstractAnalysisScene(ABC, Scene, Generic[L, E]):
+class AbstractAnalysisScene(Scene, Generic[L, E]):
 
     title_wait_time: float = 2.5
 
@@ -58,42 +57,25 @@ class AbstractAnalysisScene(ABC, Scene, Generic[L, E]):
 
     control_flow_function_set_wait_time: float = 2.5
 
-    sorting_function = default_sorting_function
+    sorting_function: Callable[[Iterable[Hashable]], list[Hashable]] = (
+        default_sorting_function
+    )
 
-    @property
-    def title(self) -> str:
-        """The title of the scene."""
-        return "Dataflow Analysis"
+    title: str = "Dataflow Analysis"
 
-    @property
-    def program_subtitle(self) -> str:
-        """The subtitle of the program."""
-        return "Here is the program that we are going to analyse."
+    program_subtitle: str = "Here is the program that we are going to analyse."
 
-    @property
-    def program_conversion_subtitle(self) -> str:
-        """The subtitle of the program conversion."""
-        return "First, we need to convert it into a control flow graph."
+    program_conversion_subtitle: str = (
+        "First, we need to convert it into a control flow graph."
+    )
 
-    @property
-    @abstractmethod
-    def program(self) -> AstProgram:
-        """The program to analyse."""
+    program: AstProgram
 
-    @property
-    @abstractmethod
-    def lattice(self) -> Lattice[L]:
-        """The lattice of the analysis."""
+    lattice: Lattice[L]
 
-    @property
-    @abstractmethod
-    def control_flow_function(self) -> ControlFlowFunction[L]:
-        """The control flow function of the analysis"""
+    control_flow_function: ControlFlowFunction[L]
 
-    @property
-    @abstractmethod
-    def condition_update_function(self) -> ConditionUpdateFunction[L, E]:
-        """The condition update function of the analysis"""
+    condition_update_function: ConditionUpdateFunction[L, E]
 
     def show_title(self) -> None:
         title = Text(self.title)
