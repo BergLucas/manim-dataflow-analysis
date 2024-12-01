@@ -1,20 +1,29 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import TypeVar, Generic, Hashable
+from typing import TypeVar, Generic, Hashable, Collection
 from manim.scene.scene import Scene
 from manim_dataflow_analysis.ast import AstProgram
-from manim_dataflow_analysis.cfg import ControlFlowGraph, ProgramPoint
+from manim_dataflow_analysis.cfg import ControlFlowGraph, ProgramPoint, succ, cond
+from manim_dataflow_analysis.condition_update_function import ConditionUpdateFunction
 from manim_dataflow_analysis.lattice import (
     LatticeGraph,
     Lattice,
     default_sorting_function,
 )
+from manim_dataflow_analysis.abstract_environment import (
+    AbstractEnvironment,
+    AbstractEnvironmentUpdateRules,
+)
+from manim_dataflow_analysis.flow_function import ControlFlowFunction
+from manim.mobject.geometry.shape_matchers import SurroundingRectangle
+from manim.mobject.types.vectorized_mobject import VMobject
 from manim.mobject.geometry.line import Arrow
 from manim.mobject.text.code_mobject import Code
 from manim.mobject.text.text_mobject import Text
 from manim.animation.creation import Create, Uncreate, Write, Unwrite
-from manim.animation.transform import FadeTransform
+from manim.animation.transform import FadeTransform, Transform
 from manim.constants import LEFT, RIGHT, DOWN
+from frozendict import frozendict
 import networkx as nx
 import numpy as np
 
@@ -25,19 +34,29 @@ E = TypeVar("E", bound=Hashable)
 
 class AbstractAnalysisScene(ABC, Scene, Generic[L, E]):
 
-    title_wait_time: int = 2.5
+    title_wait_time: float = 2.5
 
-    program_wait_time: int = 2.5
+    program_wait_time: float = 2.5
 
-    program_conversion_wait_time: int = 2.5
+    program_conversion_wait_time: float = 2.5
 
-    cfg_wait_time: int = 5
+    cfg_wait_time: float = 5.0
 
-    lattice_wait_time: int = 5
+    lattice_wait_time: float = 5.0
 
-    lattice_transform_wait_time: int = 2.5
+    lattice_transform_wait_time: float = 2.5
 
-    lattice_join_wait_time: int = 5
+    lattice_join_wait_time: float = 5.0
+
+    flow_function_wait_time: float = 2.5
+
+    flow_function_set_wait_time: float = 2.5
+
+    control_flow_function_wait_time: float = 2.5
+
+    control_flow_function_highlight_wait_time: float = 2.5
+
+    control_flow_function_set_wait_time: float = 2.5
 
     sorting_function = default_sorting_function
 
@@ -66,9 +85,15 @@ class AbstractAnalysisScene(ABC, Scene, Generic[L, E]):
     def lattice(self) -> Lattice[L]:
         """The lattice of the analysis."""
 
+    @property
     @abstractmethod
-    def condition_update(self, condition: E):
-        """Update the condition."""
+    def control_flow_function(self) -> ControlFlowFunction[L]:
+        """The control flow function of the analysis"""
+
+    @property
+    @abstractmethod
+    def condition_update_function(self) -> ConditionUpdateFunction[L, E]:
+        """The condition update function of the analysis"""
 
     def show_title(self) -> None:
         title = Text(self.title)
@@ -232,6 +257,175 @@ class AbstractAnalysisScene(ABC, Scene, Generic[L, E]):
 
         return new_lattice_graph
 
+    def show_flow_functions_instance(
+        self,
+        instance_id: int,
+        control_flow_modification: VMobject,
+        control_flow_modification_rectangle: SurroundingRectangle,
+    ):
+        rules = AbstractEnvironmentUpdateRules(
+            self.control_flow_function.flow_function.instances
+        )
+        rules.scale_to_fit_width(self.camera.frame_width * 0.8)
+
+        rule = rules.get_rule_part(instance_id)
+        condition = rules.get_condition_part(instance_id)
+        modification = rules.get_modification_part(instance_id)
+
+        rule_rectangle = SurroundingRectangle(rule)
+        modification_rectangle = SurroundingRectangle(modification)
+        if condition is not None:
+            condition_rectangle = SurroundingRectangle(condition)
+        else:
+            condition_rectangle = None
+
+        self.play(Write(rules))
+
+        if condition_rectangle is not None:
+            self.play(
+                Create(condition_rectangle),
+                Transform(control_flow_modification, rule),
+                Transform(control_flow_modification_rectangle, rule_rectangle),
+            )
+        else:
+            self.play(
+                Transform(control_flow_modification, rule),
+                Transform(control_flow_modification_rectangle, rule_rectangle),
+            )
+
+        self.wait(self.flow_function_wait_time)
+
+        self.remove(control_flow_modification, control_flow_modification_rectangle)
+
+        if condition_rectangle is not None:
+            self.play(
+                Transform(rule_rectangle, modification_rectangle),
+                Transform(condition_rectangle, modification_rectangle),
+            )
+        else:
+            self.play(Transform(rule_rectangle, modification_rectangle))
+
+        self.wait(self.flow_function_set_wait_time)
+
+        if condition_rectangle is not None:
+            self.remove(rule_rectangle, condition_rectangle)
+        else:
+            self.remove(rule_rectangle)
+
+        self.play(Unwrite(rules), Uncreate(modification_rectangle))
+
+    def show_control_flow_functions_instance(
+        self,
+        instance_id: int | tuple[int, int],
+    ):
+        rules = AbstractEnvironmentUpdateRules(self.control_flow_function.instances)
+        rules.scale_to_fit_width(self.camera.frame_width * 0.8)
+
+        if isinstance(instance_id, int):
+            flow_instance_id = None
+        else:
+            instance_id, flow_instance_id = instance_id
+
+        rule = rules.get_rule_part(instance_id)
+        condition = rules.get_condition_part(instance_id)
+        modification = rules.get_modification_part(instance_id)
+
+        rule_rectangle = SurroundingRectangle(rule)
+        modification_rectangle = SurroundingRectangle(modification)
+        if condition is not None:
+            condition_rectangle = SurroundingRectangle(condition)
+        else:
+            condition_rectangle = None
+
+        self.play(Write(rules))
+
+        self.wait(self.control_flow_function_wait_time)
+
+        if condition_rectangle is not None:
+            self.play(Create(rule_rectangle), Create(condition_rectangle))
+        else:
+            self.play(Create(rule_rectangle))
+
+        self.wait(self.control_flow_function_highlight_wait_time)
+
+        if condition_rectangle is not None:
+            self.play(
+                Transform(rule_rectangle, modification_rectangle),
+                Transform(condition_rectangle, modification_rectangle),
+            )
+        else:
+            self.play(
+                Transform(rule_rectangle, modification_rectangle),
+            )
+
+        self.wait(self.control_flow_function_set_wait_time)
+
+        if flow_instance_id is not None:
+            modification_copy = modification.copy()
+            modification_rectangle_copy = modification_rectangle.copy()
+
+            self.add(modification_copy, modification_rectangle_copy)
+
+            self.play(Unwrite(rules))
+
+            if condition_rectangle is not None:
+                self.remove(rule_rectangle, condition_rectangle, modification_rectangle)
+            else:
+                self.remove(rule_rectangle, modification_rectangle)
+
+            self.show_flow_functions_instance(
+                flow_instance_id,
+                modification_copy,
+                modification_rectangle_copy,
+            )
+        else:
+            if condition_rectangle is not None:
+                self.remove(rule_rectangle, condition_rectangle)
+            else:
+                self.remove(rule_rectangle)
+
+            self.play(Unwrite(rules), Uncreate(modification_rectangle))
+
+    def worklist(
+        self,
+        entry_point: ProgramPoint,
+        cfg: nx.DiGraph[ProgramPoint],
+        variables: Collection[str],
+        lattice_graph: LatticeGraph[L],
+    ):
+        abstract_environments = {
+            p: AbstractEnvironment(
+                self.lattice,
+                frozendict((variable, self.lattice.bottom()) for variable in variables),
+            )
+            for p in cfg.nodes
+        }
+
+        worklist = {entry_point}
+        while worklist:
+            program_point = worklist.pop()
+
+            res, control_flow_instance_id = self.control_flow_function.apply(
+                program_point, abstract_environments[program_point]
+            )
+
+            self.show_control_flow_functions_instance(control_flow_instance_id)
+
+            for successor in succ(cfg, program_point):
+                resCond, condition_update_instance_id = (
+                    self.condition_update_function.apply(
+                        cond(cfg, program_point, successor),
+                        res,
+                    )
+                )
+
+                if not abstract_environments[successor].includes(resCond):
+                    abstract_environments[successor] = abstract_environments[
+                        successor
+                    ].join(resCond)
+
+                    worklist.add(successor)
+
     def construct(self):
         self.show_title()
 
@@ -244,3 +438,12 @@ class AbstractAnalysisScene(ABC, Scene, Generic[L, E]):
         self.clear()
 
         lattice_graph = self.show_lattice_graph()
+
+        self.clear()
+
+        self.worklist(
+            entry_point,
+            program_cfg,
+            self.program.variables,
+            lattice_graph,
+        )
