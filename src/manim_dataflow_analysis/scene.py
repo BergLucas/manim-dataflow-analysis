@@ -57,6 +57,12 @@ class AbstractAnalysisScene(Scene, Generic[L, E]):
 
     control_flow_function_set_wait_time: float = 2.5
 
+    condition_update_function_wait_time: float = 2.5
+
+    condition_update_function_highlight_wait_time: float = 2.5
+
+    condition_update_function_set_wait_time: float = 2.5
+
     sorting_function: Callable[[Iterable[Hashable]], list[Hashable]] = (
         default_sorting_function
     )
@@ -239,7 +245,7 @@ class AbstractAnalysisScene(Scene, Generic[L, E]):
 
         return new_lattice_graph
 
-    def show_flow_functions_instance(
+    def show_flow_function_instance(
         self,
         instance_id: int,
         control_flow_modification: VMobject,
@@ -296,7 +302,7 @@ class AbstractAnalysisScene(Scene, Generic[L, E]):
 
         self.play(Unwrite(rules), Uncreate(modification_rectangle))
 
-    def show_control_flow_functions_instance(
+    def show_control_flow_function_instance(
         self,
         instance_id: int | tuple[int, int],
     ):
@@ -355,7 +361,7 @@ class AbstractAnalysisScene(Scene, Generic[L, E]):
             else:
                 self.remove(rule_rectangle, modification_rectangle)
 
-            self.show_flow_functions_instance(
+            self.show_flow_function_instance(
                 flow_instance_id,
                 modification_copy,
                 modification_rectangle_copy,
@@ -367,6 +373,51 @@ class AbstractAnalysisScene(Scene, Generic[L, E]):
                 self.remove(rule_rectangle)
 
             self.play(Unwrite(rules), Uncreate(modification_rectangle))
+
+    def show_condition_update_function_instance(self, instance_id: int):
+        rules = AbstractEnvironmentUpdateRules(self.condition_update_function.instances)
+        rules.scale_to_fit_width(self.camera.frame_width * 0.5)
+
+        rule = rules.get_rule_part(instance_id)
+        condition = rules.get_condition_part(instance_id)
+        modification = rules.get_modification_part(instance_id)
+
+        rule_rectangle = SurroundingRectangle(rule)
+        modification_rectangle = SurroundingRectangle(modification)
+        if condition is not None:
+            condition_rectangle = SurroundingRectangle(condition)
+        else:
+            condition_rectangle = None
+
+        self.play(Write(rules))
+
+        self.wait(self.condition_update_function_wait_time)
+
+        if condition_rectangle is not None:
+            self.play(Create(rule_rectangle), Create(condition_rectangle))
+        else:
+            self.play(Create(rule_rectangle))
+
+        self.wait(self.condition_update_function_highlight_wait_time)
+
+        if condition_rectangle is not None:
+            self.play(
+                Transform(rule_rectangle, modification_rectangle),
+                Transform(condition_rectangle, modification_rectangle),
+            )
+        else:
+            self.play(
+                Transform(rule_rectangle, modification_rectangle),
+            )
+
+        self.wait(self.condition_update_function_set_wait_time)
+
+        if condition_rectangle is not None:
+            self.remove(rule_rectangle, condition_rectangle)
+        else:
+            self.remove(rule_rectangle)
+
+        self.play(Unwrite(rules), Uncreate(modification_rectangle))
 
     def worklist(
         self,
@@ -387,24 +438,24 @@ class AbstractAnalysisScene(Scene, Generic[L, E]):
         while worklist:
             program_point = worklist.pop()
 
-            res, control_flow_instance_id = self.control_flow_function.apply(
+            res, res_instance_id = self.control_flow_function.apply(
                 program_point, abstract_environments[program_point]
             )
 
-            self.show_control_flow_functions_instance(control_flow_instance_id)
+            self.show_control_flow_function_instance(res_instance_id)
 
             for successor in succ(cfg, program_point):
-                resCond, condition_update_instance_id = (
-                    self.condition_update_function.apply(
-                        cond(cfg, program_point, successor),
-                        res,
-                    )
+                res_cond, res_cond_instance_id = self.condition_update_function.apply(
+                    cond(cfg, program_point, successor),
+                    res,
                 )
 
-                if not abstract_environments[successor].includes(resCond):
+                self.show_condition_update_function_instance(res_cond_instance_id)
+
+                if not abstract_environments[successor].includes(res_cond):
                     abstract_environments[successor] = abstract_environments[
                         successor
-                    ].join(resCond)
+                    ].join(res_cond)
 
                     worklist.add(successor)
 
