@@ -7,10 +7,10 @@ from abc import abstractmethod
 L = TypeVar("L")
 
 
-class FlowFunctions(Protocol[L]):
+class FlowFunction(Protocol[L]):
     @property
     @abstractmethod
-    def rules(self) -> Sequence[tuple[str, str, str | None]]: ...
+    def instances(self) -> Sequence[tuple[str, str, str | None]]: ...
 
     @abstractmethod
     def apply(
@@ -20,14 +20,14 @@ class FlowFunctions(Protocol[L]):
     ) -> tuple[AbstractEnvironment[L], int]: ...
 
 
-class ControlFlowFunctions(Protocol[L]):
+class ControlFlowFunction(Protocol[L]):
     @property
     @abstractmethod
-    def rules(self) -> Sequence[tuple[str, str, str | None]]: ...
+    def instances(self) -> Sequence[tuple[str, str, str | None]]: ...
 
     @property
     @abstractmethod
-    def flow_functions(self) -> FlowFunctions[L] | None: ...
+    def flow_function(self) -> FlowFunction[L] | None: ...
 
     @abstractmethod
     def apply(
