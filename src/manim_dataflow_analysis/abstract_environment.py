@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TypeVar, Generic, Iterable, Generator
+from typing import TypeVar, Generic, Iterable, Generator, Mapping
 from manim.mobject.types.vectorized_mobject import VGroup, VMobject
 from manim.mobject.text.tex_mobject import MathTex, SingleStringMathTex
 from manim_dataflow_analysis.lattice import Lattice
@@ -54,7 +54,7 @@ class AbstractEnvironment(Generic[L]):
     def includes(self, other: AbstractEnvironment[L]) -> bool:
         return all(included for _, included in self.includes_generator(other))
 
-    def set(self, **variables: L) -> AbstractEnvironment[L]:
+    def set(self, variables: Mapping[str, L]) -> AbstractEnvironment[L]:
         return AbstractEnvironment(self.lattice, self.variables | variables)
 
     def __getitem__(self, variable: str) -> L:
