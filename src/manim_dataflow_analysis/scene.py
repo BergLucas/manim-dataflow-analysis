@@ -1,6 +1,7 @@
 from __future__ import annotations
-from typing import TypeVar, Generic, Hashable, Collection, Iterable, Callable
+from typing import TypeVar, Generic, Hashable, Collection, Iterable, Callable, Generator
 from manim.scene.scene import Scene
+from manim.mobject.mobject import Mobject
 from manim_dataflow_analysis.ast import AstProgram
 from manim_dataflow_analysis.cfg import ControlFlowGraph, ProgramPoint, succ, cond
 from manim_dataflow_analysis.condition_update_function import ConditionUpdateFunction
@@ -14,14 +15,18 @@ from manim_dataflow_analysis.abstract_environment import (
     AbstractEnvironmentUpdateRules,
 )
 from manim_dataflow_analysis.flow_function import ControlFlowFunction
+from manim_dataflow_analysis.worklist import WorklistTex, WorklistTable, ResTable
 from manim.mobject.geometry.shape_matchers import SurroundingRectangle
 from manim.mobject.types.vectorized_mobject import VMobject
+from manim.animation.animation import Animation
 from manim.mobject.geometry.line import Arrow
 from manim.mobject.text.code_mobject import Code
 from manim.mobject.text.text_mobject import Text
 from manim.animation.creation import Create, Uncreate, Write, Unwrite
 from manim.animation.transform import FadeTransform, Transform
 from manim.constants import LEFT, RIGHT, DOWN
+from manim.utils.color import ORANGE
+from contextlib import contextmanager
 from frozendict import frozendict
 import networkx as nx
 import numpy as np
@@ -120,7 +125,7 @@ class AbstractAnalysisScene(Scene, Generic[L, E]):
 
     def show_cfg(
         self, position: tuple[int, int, int] = (0, 0, 0), scale: float = 0.5
-    ) -> tuple[ProgramPoint, ControlFlowGraph, nx.DiGraph[ProgramPoint]]:
+    ) -> tuple[ProgramPoint, nx.DiGraph[ProgramPoint], ControlFlowGraph]:
         entry_point, program_cfg = self.program.to_cfg()
 
         cfg = ControlFlowGraph.from_cfg(entry_point, program_cfg)
@@ -136,7 +141,7 @@ class AbstractAnalysisScene(Scene, Generic[L, E]):
 
     def show_program_conversion(
         self, program: Code, program_subtitle: Text
-    ) -> tuple[ProgramPoint, ControlFlowGraph, nx.DiGraph[ProgramPoint]]:
+    ) -> tuple[ProgramPoint, nx.DiGraph[ProgramPoint], ControlFlowGraph]:
         self.play(Unwrite(program_subtitle))
 
         program_conversion_subtitle = Text(self.program_conversion_subtitle)
@@ -419,38 +424,222 @@ class AbstractAnalysisScene(Scene, Generic[L, E]):
 
         self.play(Unwrite(rules), Uncreate(modification_rectangle))
 
+    @contextmanager
+    def animate_mobject(
+        self,
+        previous_mobject: Mobject | None,
+        new_mobject: Mobject | None,
+    ) -> Generator[tuple[Animation | None, Mobject | None], None, None]:
+        if previous_mobject is not None and new_mobject is not None:
+            yield Transform(previous_mobject, new_mobject), new_mobject
+            self.remove(previous_mobject)
+            self.add(new_mobject)
+        elif previous_mobject is not None and new_mobject is None:
+            yield Uncreate(previous_mobject), None
+        elif new_mobject is not None and previous_mobject is None:
+            yield Create(new_mobject), new_mobject
+        else:
+            yield None, None
+
+    def scale_mobject(self, mobject: Mobject, max_x: float, max_y: float) -> None:
+        if mobject.width >= mobject.height:
+            if max_y / max_x >= mobject.height / mobject.width:
+                mobject.scale(max_x / mobject.width)
+            else:
+                mobject.scale(max_y / mobject.height)
+        else:
+            if max_x / max_y >= mobject.width / mobject.height:
+                mobject.scale(max_y / mobject.height)
+            else:
+                mobject.scale(max_x / mobject.width)
+
+    def create_worklist_table(
+        self,
+        variables: Collection[str],
+        abstract_environments: dict[ProgramPoint, AbstractEnvironment[L]],
+    ) -> WorklistTable[L]:
+        table = WorklistTable(variables, abstract_environments)
+
+        self.scale_mobject(
+            table,
+            self.camera.frame_width * 0.45,
+            self.camera.frame_height * 0.55,
+        )
+
+        table.move_to(
+            (self.camera.frame_width * 0.25, self.camera.frame_height * -0.2, 0)
+        )
+
+        return table
+
+    def create_res_table(
+        self,
+        variables: Collection[str],
+        res: AbstractEnvironment[L] | None = None,
+        res_cond: AbstractEnvironment[L] | None = None,
+    ) -> ResTable[L]:
+        res_table = ResTable(variables, res, res_cond)
+
+        self.scale_mobject(
+            res_table,
+            self.camera.frame_width * 0.45,
+            self.camera.frame_height * 0.25,
+        )
+
+        res_table.move_to(
+            (self.camera.frame_width * 0.25, self.camera.frame_height * 0.225, 0)
+        )
+
+        return res_table
+
+    def create_worklist_tex(self, worklist: set[ProgramPoint]) -> WorklistTex:
+        worklist_tex = WorklistTex(worklist)
+
+        self.scale_mobject(
+            worklist_tex,
+            self.camera.frame_width * 0.45,
+            self.camera.frame_height * 0.10,
+        )
+
+        worklist_tex.move_to(
+            (self.camera.frame_width * 0.25, self.camera.frame_height * 0.425, 0)
+        )
+
+        return worklist_tex
+
     def worklist(
         self,
         entry_point: ProgramPoint,
-        cfg: nx.DiGraph[ProgramPoint],
+        program_cfg: nx.DiGraph[ProgramPoint],
+        cfg: ControlFlowGraph,
         variables: Collection[str],
-        lattice_graph: LatticeGraph[L],
     ):
         abstract_environments = {
             p: AbstractEnvironment(
                 self.lattice,
                 frozendict((variable, self.lattice.bottom()) for variable in variables),
             )
-            for p in cfg.nodes
+            for p in program_cfg.nodes
         }
 
         worklist = {entry_point}
+
+        table = self.create_worklist_table(variables, abstract_environments)
+
+        self.scale_mobject(
+            cfg,
+            self.camera.frame_width * 0.45,
+            self.camera.frame_height,
+        )
+
+        cfg.move_to((self.camera.frame_width * -0.25, 0, 0))
+
+        res_table = self.create_res_table(variables)
+
+        worklist_tex = self.create_worklist_tex(worklist)
+
+        self.play(Create(table), Create(cfg), Create(res_table), Create(worklist_tex))
+
         while worklist:
             program_point = worklist.pop()
+
+            worklist_program_point_rectangle = SurroundingRectangle(
+                worklist_tex.get_program_point_part(program_point)
+            )
+
+            self.play(Create(worklist_program_point_rectangle))
+
+            table_program_point_rectangle = None
+            program_point_rectangle = None
+
+            with (
+                self.animate_mobject(
+                    worklist_tex,
+                    self.create_worklist_tex(worklist),
+                ) as (
+                    worklist_animation,
+                    worklist_tex,
+                ),
+                self.animate_mobject(
+                    program_point_rectangle,
+                    SurroundingRectangle(cfg[program_point]),
+                ) as (
+                    program_point_animation,
+                    program_point_rectangle,
+                ),
+                self.animate_mobject(
+                    table_program_point_rectangle,
+                    SurroundingRectangle(table.get_program_point_part(program_point)),
+                ) as (
+                    table_program_point_animation,
+                    table_program_point_rectangle,
+                ),
+            ):
+                self.play(
+                    Uncreate(worklist_program_point_rectangle),
+                    worklist_animation,
+                    program_point_animation,
+                    table_program_point_animation,
+                )
 
             res, res_instance_id = self.control_flow_function.apply(
                 program_point, abstract_environments[program_point]
             )
 
-            self.show_control_flow_function_instance(res_instance_id)
+            with (
+                self.animate_mobject(
+                    res_table,
+                    self.create_res_table(variables, res),
+                ) as (res_table_animation, res_table),
+            ):
+                self.play(res_table_animation)
 
-            for successor in succ(cfg, program_point):
+            # self.show_control_flow_function_instance(res_instance_id)
+
+            table_successor_program_point_rectangle = None
+            successor_program_point_rectangle = None
+
+            for successor in succ(program_cfg, program_point):
                 res_cond, res_cond_instance_id = self.condition_update_function.apply(
-                    cond(cfg, program_point, successor),
+                    cond(program_cfg, program_point, successor),
                     res,
                 )
 
-                self.show_condition_update_function_instance(res_cond_instance_id)
+                with (
+                    self.animate_mobject(
+                        successor_program_point_rectangle,
+                        SurroundingRectangle(cfg[successor], color=ORANGE),
+                    ) as (
+                        successor_program_point_animation,
+                        successor_program_point_rectangle,
+                    ),
+                    self.animate_mobject(
+                        table_successor_program_point_rectangle,
+                        SurroundingRectangle(
+                            table.get_program_point_part(successor), color=ORANGE
+                        ),
+                    ) as (
+                        table_successor_program_point_animation,
+                        table_successor_program_point_rectangle,
+                    ),
+                ):
+                    self.play(
+                        successor_program_point_animation,
+                        table_successor_program_point_animation,
+                    )
+
+                with (
+                    self.animate_mobject(
+                        res_table,
+                        self.create_res_table(variables, res, res_cond),
+                    ) as (
+                        res_table_animation,
+                        res_table,
+                    ),
+                ):
+                    self.play(res_table_animation)
+
+                # self.show_condition_update_function_instance(res_cond_instance_id)
 
                 if not abstract_environments[successor].includes(res_cond):
                     abstract_environments[successor] = abstract_environments[
@@ -458,6 +647,89 @@ class AbstractAnalysisScene(Scene, Generic[L, E]):
                     ].join(res_cond)
 
                     worklist.add(successor)
+
+                    with (
+                        self.animate_mobject(
+                            worklist_tex,
+                            self.create_worklist_tex(worklist),
+                        ) as (
+                            worklist_animation,
+                            worklist_tex,
+                        ),
+                        self.animate_mobject(
+                            table,
+                            self.create_worklist_table(
+                                variables, abstract_environments
+                            ),
+                        ) as (
+                            table_animation,
+                            table,
+                        ),
+                    ):
+                        self.play(worklist_animation, table_animation)
+
+                with (
+                    self.animate_mobject(
+                        res_table,
+                        self.create_res_table(variables, res),
+                    ) as (
+                        res_table_animation,
+                        res_table,
+                    ),
+                ):
+                    self.play(res_table_animation)
+
+            with (
+                self.animate_mobject(
+                    res_table,
+                    self.create_res_table(variables),
+                ) as (
+                    res_table_animation,
+                    res_table,
+                ),
+                self.animate_mobject(
+                    program_point_rectangle,
+                    None,
+                ) as (
+                    program_point_animation,
+                    program_point_rectangle,
+                ),
+                self.animate_mobject(
+                    table_program_point_rectangle,
+                    None,
+                ) as (
+                    table_program_point_animation,
+                    table_program_point_rectangle,
+                ),
+                self.animate_mobject(
+                    successor_program_point_rectangle,
+                    None,
+                ) as (
+                    successor_program_point_animation,
+                    successor_program_point_rectangle,
+                ),
+                self.animate_mobject(
+                    table_successor_program_point_rectangle,
+                    None,
+                ) as (
+                    table_successor_program_point_animation,
+                    table_successor_program_point_rectangle,
+                ),
+            ):
+                if (
+                    successor_program_point_animation is not None
+                    and table_successor_program_point_animation is not None
+                ):
+                    self.play(
+                        successor_program_point_animation,
+                        table_successor_program_point_animation,
+                    )
+
+                self.play(
+                    res_table_animation,
+                    program_point_animation,
+                    table_program_point_animation,
+                )
 
     def construct(self):
         self.show_title()
@@ -477,6 +749,8 @@ class AbstractAnalysisScene(Scene, Generic[L, E]):
         self.worklist(
             entry_point,
             program_cfg,
+            cfg,
             self.program.variables,
-            lattice_graph,
         )
+
+        self.wait(5)
