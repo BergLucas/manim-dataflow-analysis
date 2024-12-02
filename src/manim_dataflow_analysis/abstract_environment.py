@@ -61,7 +61,7 @@ class AbstractEnvironment(Generic[L]):
         return self.variables[variable]
 
 
-RULE_PART_INDEX = 1
+INSTANCE_PART_INDEX = 1
 MODIFICATION_PART_INDEX = 3
 IF_OTHERWISE_INDEX = 5
 CONDITION_PART_INDEX = 7
@@ -70,16 +70,18 @@ LINE_LENGTH = 10
 EMPTY_CHARACTER = r"\hspace{0pt}"
 
 
-class AbstractEnvironmentUpdateRules(MathTex, Generic[L]):
+class AbstractEnvironmentUpdateInstances(MathTex, Generic[L]):
 
-    def __init__(self, updates_rules: Iterable[tuple[str, str, str | None]]) -> None:
+    def __init__(
+        self, updates_instances: Iterable[tuple[str, str, str | None]]
+    ) -> None:
         tex_strings: list[str] = []
 
-        for rule_tex, modification_tex, condition_tex in updates_rules:
+        for instance_tex, modification_tex, condition_tex in updates_instances:
             tex_strings.extend(
                 (
                     r"&",
-                    rule_tex,
+                    instance_tex,
                     r"& = & \quad",
                     modification_tex,
                     r"& &",
@@ -101,8 +103,8 @@ class AbstractEnvironmentUpdateRules(MathTex, Generic[L]):
 
         super().__init__(*tex_strings)
 
-    def get_rule_part(self, index: int) -> VMobject:
-        return self.submobjects[index * LINE_LENGTH + RULE_PART_INDEX]
+    def get_instance_part(self, index: int) -> VMobject:
+        return self.submobjects[index * LINE_LENGTH + INSTANCE_PART_INDEX]
 
     def get_condition_part(self, index: int) -> VMobject | None:
         if_otherwise = self.submobjects[index * LINE_LENGTH + IF_OTHERWISE_INDEX]

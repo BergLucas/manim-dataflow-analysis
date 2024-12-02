@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import TypeVar, Generic, Hashable, Collection, Iterable, Callable, Generator
-from manim.scene.scene import Scene
+from manim.scene.zoomed_scene import MovingCameraScene
 from manim.mobject.mobject import Mobject
 from manim_dataflow_analysis.ast import AstProgram
 from manim_dataflow_analysis.cfg import ControlFlowGraph, ProgramPoint, succ, cond
@@ -12,7 +12,7 @@ from manim_dataflow_analysis.lattice import (
 )
 from manim_dataflow_analysis.abstract_environment import (
     AbstractEnvironment,
-    AbstractEnvironmentUpdateRules,
+    AbstractEnvironmentUpdateInstances,
 )
 from manim_dataflow_analysis.flow_function import ControlFlowFunction
 from manim_dataflow_analysis.worklist import WorklistTex, WorklistTable, ResTable
@@ -36,7 +36,7 @@ L = TypeVar("L", bound=Hashable)
 E = TypeVar("E", bound=Hashable)
 
 
-class AbstractAnalysisScene(Scene, Generic[L, E]):
+class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
     title_wait_time: float = 2.5
 
@@ -256,34 +256,34 @@ class AbstractAnalysisScene(Scene, Generic[L, E]):
         control_flow_modification: VMobject,
         control_flow_modification_rectangle: SurroundingRectangle,
     ):
-        rules = AbstractEnvironmentUpdateRules(
+        instances_tex = AbstractEnvironmentUpdateInstances(
             self.control_flow_function.flow_function.instances
         )
-        rules.scale_to_fit_width(self.camera.frame_width * 0.8)
+        instances_tex.scale_to_fit_width(self.camera.frame_width * 0.8)
 
-        rule = rules.get_rule_part(instance_id)
-        condition = rules.get_condition_part(instance_id)
-        modification = rules.get_modification_part(instance_id)
+        instance = instances_tex.get_instance_part(instance_id)
+        condition = instances_tex.get_condition_part(instance_id)
+        modification = instances_tex.get_modification_part(instance_id)
 
-        rule_rectangle = SurroundingRectangle(rule)
+        instance_rectangle = SurroundingRectangle(instance)
         modification_rectangle = SurroundingRectangle(modification)
         if condition is not None:
             condition_rectangle = SurroundingRectangle(condition)
         else:
             condition_rectangle = None
 
-        self.play(Write(rules))
+        self.play(Write(instances_tex))
 
         if condition_rectangle is not None:
             self.play(
                 Create(condition_rectangle),
-                Transform(control_flow_modification, rule),
-                Transform(control_flow_modification_rectangle, rule_rectangle),
+                Transform(control_flow_modification, instance),
+                Transform(control_flow_modification_rectangle, instance_rectangle),
             )
         else:
             self.play(
-                Transform(control_flow_modification, rule),
-                Transform(control_flow_modification_rectangle, rule_rectangle),
+                Transform(control_flow_modification, instance),
+                Transform(control_flow_modification_rectangle, instance_rectangle),
             )
 
         self.wait(self.flow_function_wait_time)
@@ -292,63 +292,69 @@ class AbstractAnalysisScene(Scene, Generic[L, E]):
 
         if condition_rectangle is not None:
             self.play(
-                Transform(rule_rectangle, modification_rectangle),
+                Transform(instance_rectangle, modification_rectangle),
                 Transform(condition_rectangle, modification_rectangle),
             )
         else:
-            self.play(Transform(rule_rectangle, modification_rectangle))
+            self.play(Transform(instance_rectangle, modification_rectangle))
 
         self.wait(self.flow_function_set_wait_time)
 
         if condition_rectangle is not None:
-            self.remove(rule_rectangle, condition_rectangle)
+            self.remove(instance_rectangle, condition_rectangle)
         else:
-            self.remove(rule_rectangle)
+            self.remove(instance_rectangle)
 
-        self.play(Unwrite(rules), Uncreate(modification_rectangle))
+        self.play(Unwrite(instances_tex), Uncreate(modification_rectangle))
 
     def show_control_flow_function_instance(
         self,
         instance_id: int | tuple[int, int],
     ):
-        rules = AbstractEnvironmentUpdateRules(self.control_flow_function.instances)
-        rules.scale_to_fit_width(self.camera.frame_width * 0.8)
+        instances_tex = AbstractEnvironmentUpdateInstances(
+            self.control_flow_function.instances
+        )
+        self.scale_mobject(
+            instances_tex,
+            self.camera.frame_width * 0.95,
+            self.camera.frame_height * 0.95,
+        )
 
         if isinstance(instance_id, int):
             flow_instance_id = None
         else:
             instance_id, flow_instance_id = instance_id
 
-        rule = rules.get_rule_part(instance_id)
-        condition = rules.get_condition_part(instance_id)
-        modification = rules.get_modification_part(instance_id)
+        instance = instances_tex.get_instance_part(instance_id)
+        condition = instances_tex.get_condition_part(instance_id)
+        modification = instances_tex.get_modification_part(instance_id)
 
-        rule_rectangle = SurroundingRectangle(rule)
+        instance_rectangle = SurroundingRectangle(instance)
         modification_rectangle = SurroundingRectangle(modification)
         if condition is not None:
             condition_rectangle = SurroundingRectangle(condition)
         else:
             condition_rectangle = None
 
-        self.play(Write(rules))
+        self.play(Write(instances_tex))
 
         self.wait(self.control_flow_function_wait_time)
 
         if condition_rectangle is not None:
-            self.play(Create(rule_rectangle), Create(condition_rectangle))
+            self.play(Create(instance_rectangle), Create(condition_rectangle))
         else:
-            self.play(Create(rule_rectangle))
+            self.play(Create(instance_rectangle))
 
         self.wait(self.control_flow_function_highlight_wait_time)
 
         if condition_rectangle is not None:
             self.play(
-                Transform(rule_rectangle, modification_rectangle),
+                Transform(instance_rectangle, modification_rectangle),
                 Transform(condition_rectangle, modification_rectangle),
             )
         else:
             self.play(
-                Transform(rule_rectangle, modification_rectangle),
+                Transform(instance_rectangle, modification_rectangle),
             )
 
         self.wait(self.control_flow_function_set_wait_time)
@@ -359,12 +365,14 @@ class AbstractAnalysisScene(Scene, Generic[L, E]):
 
             self.add(modification_copy, modification_rectangle_copy)
 
-            self.play(Unwrite(rules))
+            self.play(Unwrite(instances_tex))
 
             if condition_rectangle is not None:
-                self.remove(rule_rectangle, condition_rectangle, modification_rectangle)
+                self.remove(
+                    instance_rectangle, condition_rectangle, modification_rectangle
+                )
             else:
-                self.remove(rule_rectangle, modification_rectangle)
+                self.remove(instance_rectangle, modification_rectangle)
 
             self.show_flow_function_instance(
                 flow_instance_id,
@@ -373,56 +381,62 @@ class AbstractAnalysisScene(Scene, Generic[L, E]):
             )
         else:
             if condition_rectangle is not None:
-                self.remove(rule_rectangle, condition_rectangle)
+                self.remove(instance_rectangle, condition_rectangle)
             else:
-                self.remove(rule_rectangle)
+                self.remove(instance_rectangle)
 
-            self.play(Unwrite(rules), Uncreate(modification_rectangle))
+            self.play(Unwrite(instances_tex), Uncreate(modification_rectangle))
 
     def show_condition_update_function_instance(self, instance_id: int):
-        rules = AbstractEnvironmentUpdateRules(self.condition_update_function.instances)
-        rules.scale_to_fit_width(self.camera.frame_width * 0.5)
+        instances_tex = AbstractEnvironmentUpdateInstances(
+            self.condition_update_function.instances
+        )
+        self.scale_mobject(
+            instances_tex,
+            self.camera.frame_width * 0.95,
+            self.camera.frame_height * 0.95,
+        )
 
-        rule = rules.get_rule_part(instance_id)
-        condition = rules.get_condition_part(instance_id)
-        modification = rules.get_modification_part(instance_id)
+        instance = instances_tex.get_instance_part(instance_id)
+        condition = instances_tex.get_condition_part(instance_id)
+        modification = instances_tex.get_modification_part(instance_id)
 
-        rule_rectangle = SurroundingRectangle(rule)
+        instance_rectangle = SurroundingRectangle(instance)
         modification_rectangle = SurroundingRectangle(modification)
         if condition is not None:
             condition_rectangle = SurroundingRectangle(condition)
         else:
             condition_rectangle = None
 
-        self.play(Write(rules))
+        self.play(Write(instances_tex))
 
         self.wait(self.condition_update_function_wait_time)
 
         if condition_rectangle is not None:
-            self.play(Create(rule_rectangle), Create(condition_rectangle))
+            self.play(Create(instance_rectangle), Create(condition_rectangle))
         else:
-            self.play(Create(rule_rectangle))
+            self.play(Create(instance_rectangle))
 
         self.wait(self.condition_update_function_highlight_wait_time)
 
         if condition_rectangle is not None:
             self.play(
-                Transform(rule_rectangle, modification_rectangle),
+                Transform(instance_rectangle, modification_rectangle),
                 Transform(condition_rectangle, modification_rectangle),
             )
         else:
             self.play(
-                Transform(rule_rectangle, modification_rectangle),
+                Transform(instance_rectangle, modification_rectangle),
             )
 
         self.wait(self.condition_update_function_set_wait_time)
 
         if condition_rectangle is not None:
-            self.remove(rule_rectangle, condition_rectangle)
+            self.remove(instance_rectangle, condition_rectangle)
         else:
-            self.remove(rule_rectangle)
+            self.remove(instance_rectangle)
 
-        self.play(Unwrite(rules), Uncreate(modification_rectangle))
+        self.play(Unwrite(instances_tex), Uncreate(modification_rectangle))
 
     @contextmanager
     def animate_mobject(
@@ -586,6 +600,16 @@ class AbstractAnalysisScene(Scene, Generic[L, E]):
                 program_point, abstract_environments[program_point]
             )
 
+            self.camera.frame.save_state()
+
+            self.play(
+                self.camera.frame.animate.move_to((0, -self.camera.frame_height, 0))
+            )
+
+            self.show_control_flow_function_instance(res_instance_id)
+
+            self.play(self.camera.frame.animate.restore())
+
             with (
                 self.animate_mobject(
                     res_table,
@@ -593,8 +617,6 @@ class AbstractAnalysisScene(Scene, Generic[L, E]):
                 ) as (res_table_animation, res_table),
             ):
                 self.play(res_table_animation)
-
-            # self.show_control_flow_function_instance(res_instance_id)
 
             table_successor_program_point_rectangle = None
             successor_program_point_rectangle = None
@@ -628,6 +650,16 @@ class AbstractAnalysisScene(Scene, Generic[L, E]):
                         table_successor_program_point_animation,
                     )
 
+                self.camera.frame.save_state()
+
+                self.play(
+                    self.camera.frame.animate.move_to((0, self.camera.frame_height, 0))
+                )
+
+                self.show_condition_update_function_instance(res_cond_instance_id)
+
+                self.play(self.camera.frame.animate.restore())
+
                 with (
                     self.animate_mobject(
                         res_table,
@@ -638,8 +670,6 @@ class AbstractAnalysisScene(Scene, Generic[L, E]):
                     ),
                 ):
                     self.play(res_table_animation)
-
-                # self.show_condition_update_function_instance(res_cond_instance_id)
 
                 if not abstract_environments[successor].includes(res_cond):
                     abstract_environments[successor] = abstract_environments[
