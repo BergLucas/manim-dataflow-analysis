@@ -76,11 +76,17 @@ class ResTable(MobjectTable, Generic[L]):
         res_cond: AbstractEnvironment[L] | None = None,
     ):
         self.res_mobjects = {
-            variable: MathTex(str(res[variable]) if res is not None else "?")
+            variable: MathTex(
+                str(res[variable]) if res is not None and variable in res else "?"
+            )
             for variable in variables
         }
         self.res_cond_mobjects = {
-            variable: MathTex(str(res_cond[variable]) if res_cond is not None else "?")
+            variable: MathTex(
+                str(res_cond[variable])
+                if res_cond is not None and variable in res_cond
+                else "?"
+            )
             for variable in variables
         }
 
