@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from manim.mobject.geometry.arc import TipableVMobject
-from manim.mobject.text.tex_mobject import Tex
+from manim.mobject.text.tex_mobject import Tex, SingleStringMathTex
+from manim.mobject.text.text_mobject import Text
 from manim.mobject.mobject import Mobject
 from manim.mobject.graph import LayoutName, LayoutFunction
 from manim.utils.color import GREEN, RED, BLACK
@@ -423,7 +424,7 @@ class ControlFlowGraph(BetterDiGraph):
         self,
         vertices: list[Hashable],
         edges: list[tuple[Hashable, Hashable]],
-        labels: bool | dict = True,
+        labels: bool | dict[Hashable, str | SingleStringMathTex | Text | Tex] = True,
         label_fill_color: str = BLACK,
         layout: (
             LayoutName
@@ -510,10 +511,6 @@ class ControlFlowGraph(BetterDiGraph):
             for v in self.vertices:
                 self[v].move_to(self._layout[v])
 
-        return self
-
-    def focus_vertex_at(self, vertex: Hashable, point: Point3D) -> ControlFlowGraph:
-        self.shift(point - self.get_center() - self[vertex].get_center())
         return self
 
 

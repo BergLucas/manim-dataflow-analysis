@@ -48,7 +48,7 @@ class BetterDiGraph(DiGraph):
         self,
         vertices: list[Hashable],
         edges: list[tuple[Hashable, Hashable]],
-        labels: bool | dict = False,
+        labels: bool | dict[Hashable, str | SingleStringMathTex | Text | Tex] = False,
         label_fill_color: str = BLACK,
         layout: LayoutName | dict[Hashable, Point3D] | LayoutFunction = "spring",
         layout_scale: float | tuple[float, float, float] = 2,
@@ -77,6 +77,10 @@ class BetterDiGraph(DiGraph):
             root_vertex,
             edge_config,
         )
+
+    @property
+    def labels(self) -> dict[Hashable, str | SingleStringMathTex | Text | Tex]:
+        return dict(self._labels)
 
     def _populate_edge_dict(
         self, edges: list[tuple[Hashable, Hashable]], edge_type: type[TipableVMobject]
