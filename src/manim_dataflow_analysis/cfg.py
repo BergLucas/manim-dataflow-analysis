@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from manim.mobject.geometry.arc import TipableVMobject
-from manim.mobject.text.text_mobject import Text
+from manim.mobject.text.tex_mobject import Tex
 from manim.mobject.mobject import Mobject
 from manim.mobject.graph import LayoutName, LayoutFunction
 from manim.utils.color import GREEN, RED, BLACK
@@ -371,7 +371,12 @@ class ControlFlowGraph(BetterDiGraph):
     def from_cfg(
         cls, entry_point: ProgramPoint, cfg: nx.DiGraph[ProgramPoint]
     ) -> ControlFlowGraph:
-        labels = {pp: Text(pp.statement.header, color=BLACK) for pp in cfg}
+        labels = {
+            pp: Tex(
+                r"\fbox{%s} \texttt{%s}" % (pp.point, pp.statement.header), color=BLACK
+            )
+            for pp in cfg
+        }
 
         vertex_spacing = (
             1.25 * max(label.width for label in labels.values()),
