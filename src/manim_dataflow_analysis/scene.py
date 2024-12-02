@@ -79,11 +79,15 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         "We will use the following control-flow function."
     )
     control_flow_function_title_width: float = fw(0.95)
-    control_flow_function_title_height: float = fw(0.2)
-    control_flow_function_title_position: tuple[float, float, float] = (0, fh(-0.6), 0)
+    control_flow_function_title_height: float = fw(0.175)
+    control_flow_function_title_position: tuple[float, float, float] = (
+        0,
+        fh(-0.6125),
+        0,
+    )
     control_flow_function_width: float = fw(0.95)
-    control_flow_function_height: float = fh(0.8)
-    control_flow_function_position: tuple[float, float, float] = (0, fh(-1.1), 0)
+    control_flow_function_height: float = fh(0.775)
+    control_flow_function_position: tuple[float, float, float] = (0, fh(-1.0775), 0)
     control_flow_function_camera_position: tuple[float, float, float] = (0, fh(-1), 0)
     control_flow_function_wait_time: float = 5.0
     control_flow_function_highlight_wait_time: float = 1.0
@@ -92,11 +96,11 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     # Flow function
     flow_function_title: str = "And the following flow function"
     flow_function_title_width: float = fw(0.95)
-    flow_function_title_height: float = fh(0.2)
-    flow_function_title_position: tuple[float, float, float] = (0, fh(-1.6), 0)
+    flow_function_title_height: float = fh(0.175)
+    flow_function_title_position: tuple[float, float, float] = (0, fh(-1.6125), 0)
     condition_update_function_width: float = fw(0.95)
-    condition_update_function_height: float = fh(0.8)
-    flow_function_position: tuple[float, float, float] = (0, fh(-2.1), 0)
+    condition_update_function_height: float = fh(0.775)
+    flow_function_position: tuple[float, float, float] = (0, fh(-2.0775), 0)
     flow_function_camera_position: tuple[float, float, float] = (0, fh(-2), 0)
     flow_function_wait_time: float = 5.0
     flow_function_highlight_time: float = 1.0
@@ -108,15 +112,15 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         "We will also use this condition update function"
     )
     condition_update_function_title_width: float = fw(0.95)
-    condition_update_function_title_height: float = fh(0.2)
+    condition_update_function_title_height: float = fh(0.175)
     condition_update_function_title_position: tuple[float, float, float] = (
         0,
-        fh(1.4),
+        fh(1.3875),
         0,
     )
     condition_update_function_width: float = fw(0.95)
-    condition_update_function_height: float = fh(0.8)
-    condition_update_function_position: tuple[float, float, float] = (0, fh(0.9), 0)
+    condition_update_function_height: float = fh(0.775)
+    condition_update_function_position: tuple[float, float, float] = (0, fh(0.9225), 0)
     condition_update_function_camera_position: tuple[float, float, float] = (
         0,
         fh(1),
@@ -130,11 +134,11 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     program: AstProgram
     program_title: str = "Here is the program that we are going to analyse."
     program_title_width: float = fw(0.95)
-    program_title_height: float = fh(0.2)
-    program_title_position: tuple[float, float, float] = (fw(-1), fh(0.4), 0)
+    program_title_height: float = fh(0.175)
+    program_title_position: tuple[float, float, float] = (fw(-1), fh(0.3875), 0)
     program_width: float = fw(0.5)
-    program_height: float = fh(0.8)
-    program_position: tuple[float, float, float] = (fw(-1), fh(-0.1), 0)
+    program_height: float = fh(0.775)
+    program_position: tuple[float, float, float] = (fw(-1), fh(-0.0775), 0)
     program_camera_position: tuple[float, float, float] = (fw(-1), 0, 0)
     program_wait_time: float = 2.5
 
@@ -143,15 +147,15 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         "First, we need to convert it into a control flow graph."
     )
     program_conversion_title_width: float = fw(0.95)
-    program_conversion_title_height: float = fh(0.2)
+    program_conversion_title_height: float = fh(0.175)
     program_conversion_title_position: tuple[float, float, float] = (
         fw(-0.45),
-        fh(0.4),
+        fh(0.3875),
         0,
     )
     program_new_width: float = fw(0.25)
-    program_new_height: float = fh(0.8)
-    program_new_position: tuple[float, float, float] = (fw(-0.75), fh(-0.1), 0)
+    program_new_height: float = fh(0.775)
+    program_new_position: tuple[float, float, float] = (fw(-0.75), fh(-0.0775), 0)
     program_arrow_start_position: tuple[float, float, float] = (fw(-0.6), fh(-0.1), 0)
     program_arrow_end_position: tuple[float, float, float] = (fw(-0.5), fh(-0.1), 0)
     program_conversion_camera_position: tuple[float, float, float] = (fw(-0.45), 0, 0)
@@ -159,8 +163,8 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
     # CFG
     cfg_width: float = fw(0.45)
-    cfg_height: float = fh(0.8)
-    cfg_position: tuple[float, float, float] = (fw(-0.25), fh(-0.1), 0)
+    cfg_height: float = fh(0.775)
+    cfg_position: tuple[float, float, float] = (fw(-0.25), fh(-0.0775), 0)
     cfg_wait_time: float = 5.0
 
     # Worklist
@@ -903,7 +907,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                             condition_update_function_result.copy(),
                             res_table.get_res_cond_variable_part(variable),
                         )
-                        for variable in res_variables
+                        for variable in res_cond_variables
                     )
                     self.play(
                         self.camera.frame.animate.move_to(
