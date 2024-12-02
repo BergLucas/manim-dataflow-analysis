@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import TypeVar, Generic, Hashable, Collection, Iterable, Callable, Generator
 from manim.scene.zoomed_scene import MovingCameraScene
 from manim.mobject.mobject import Mobject
-from manim_dataflow_analysis.ast import AstProgram
+from manim_dataflow_analysis.ast import AstProgram, AstStatement
 from manim_dataflow_analysis.cfg import ControlFlowGraph, ProgramPoint, succ, cond
 from manim_dataflow_analysis.condition_update_function import ConditionUpdateFunction
 from manim_dataflow_analysis.lattice import (
@@ -56,7 +56,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
     # Lattice
     lattice: Lattice[L]
-    lattice_title: str = "Here is the lattice that we are going to use."
+    lattice_title: str = "We will use the following lattice for our analysis :"
     lattice_title_width: float = fw(0.95)
     lattice_title_height: float = fh(0.175)
     lattice_title_position: tuple[float, float, float] = (fw(1), fh(0.3875), 0)
@@ -76,7 +76,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     # Control-flow function
     control_flow_function: ControlFlowFunction[L]
     control_flow_function_title: str = (
-        "We will use the following control-flow function."
+        "We will use the following control-flow function for our analysis :"
     )
     control_flow_function_title_width: float = fw(0.95)
     control_flow_function_title_height: float = fw(0.175)
@@ -90,11 +90,13 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     control_flow_function_position: tuple[float, float, float] = (0, fh(-1.0775), 0)
     control_flow_function_camera_position: tuple[float, float, float] = (0, fh(-1), 0)
     control_flow_function_wait_time: float = 5.0
-    control_flow_function_highlight_wait_time: float = 1.0
-    control_flow_function_set_wait_time: float = 1.0
+    control_flow_function_highlight_wait_time: float = 2.5
+    control_flow_function_set_wait_time: float = 2.5
 
     # Flow function
-    flow_function_title: str = "And the following flow function"
+    flow_function_title: str = (
+        "We will use the following flow function to help us for our analysis :"
+    )
     flow_function_title_width: float = fw(0.95)
     flow_function_title_height: float = fh(0.175)
     flow_function_title_position: tuple[float, float, float] = (0, fh(-1.6125), 0)
@@ -103,13 +105,13 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     flow_function_position: tuple[float, float, float] = (0, fh(-2.0775), 0)
     flow_function_camera_position: tuple[float, float, float] = (0, fh(-2), 0)
     flow_function_wait_time: float = 5.0
-    flow_function_highlight_time: float = 1.0
-    flow_function_set_wait_time: float = 1.0
+    flow_function_highlight_time: float = 2.5
+    flow_function_set_wait_time: float = 2.5
 
     # Condition update function
     condition_update_function: ConditionUpdateFunction[L, E]
     condition_update_function_title: str = (
-        "We will also use this condition update function"
+        "We will also use the following condition update function for our analysis :"
     )
     condition_update_function_title_width: float = fw(0.95)
     condition_update_function_title_height: float = fh(0.175)
@@ -127,12 +129,12 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         0,
     )
     condition_update_function_wait_time: float = 5.0
-    condition_update_function_highlight_wait_time: float = 1.0
-    condition_update_function_set_wait_time: float = 1.0
+    condition_update_function_highlight_wait_time: float = 2.5
+    condition_update_function_set_wait_time: float = 2.5
 
     # Program
     program: AstProgram
-    program_title: str = "Here is the program that we are going to analyse."
+    program_title: str = "Here is the program that we are going to analyse :"
     program_title_width: float = fw(0.95)
     program_title_height: float = fh(0.175)
     program_title_position: tuple[float, float, float] = (fw(-1), fh(0.3875), 0)
@@ -144,7 +146,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
     # Program conversion
     program_conversion_title: str = (
-        "First, we need to convert it into a control flow graph."
+        "First, we need to convert it into a control flow graph :"
     )
     program_conversion_title_width: float = fw(0.95)
     program_conversion_title_height: float = fh(0.175)
@@ -162,13 +164,29 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     program_conversion_wait_time: float = 2.5
 
     # CFG
+    cfg_title_width: float = fw(0.45)
+    cfg_title_height: float = fh(0.175)
+    cfg_title_position: tuple[float, float, float] = (fw(-0.25), fh(0.3875), 0)
     cfg_width: float = fw(0.45)
     cfg_height: float = fh(0.775)
     cfg_position: tuple[float, float, float] = (fw(-0.25), fh(-0.0775), 0)
     cfg_wait_time: float = 5.0
 
     # Worklist
+    worklist_pop_title_template: str = (
+        "We remove the program point {program_point} from the worklist :"
+    )
+    worklist_control_flow_function_title_template: str = (
+        "We use the control-flow function on our program point {program_point} which is the statement {statement} :"
+    )
+    worklist_flow_function_title_template: str = (
+        "We use the flow function on our statement {statement} :"
+    )
+    worklist_condition_update_function_title_template: str = (
+        "We use the condition update function on our condition {condition} :"
+    )
     worklist_camera_position: tuple[float, float, float] = (0, 0, 0)
+    worklist_pop_wait_time: float = 2.5
 
     def show_title(self) -> None:
         title = Text(self.title)
@@ -428,12 +446,25 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         self,
         flow_function_tex: AbstractEnvironmentUpdateInstances[L],
         instance_id: int,
+        statement: AstStatement,
         control_flow_modification: VMobject,
         control_flow_modification_rectangle: SurroundingRectangle,
     ):
         instance = flow_function_tex.get_instance_part(instance_id)
         condition = flow_function_tex.get_condition_part(instance_id)
         modification = flow_function_tex.get_modification_part(instance_id)
+
+        worklist_flow_function_title = Text(
+            self.worklist_flow_function_title_template.format(
+                statement=str(statement.header),
+            )
+        )
+        self.scale_mobject(
+            worklist_flow_function_title,
+            self.flow_function_title_width,
+            self.flow_function_title_height,
+        )
+        worklist_flow_function_title.move_to(self.flow_function_title_position)
 
         instance_rectangle = SurroundingRectangle(instance)
         modification_rectangle = SurroundingRectangle(modification)
@@ -445,12 +476,14 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         if condition_rectangle is not None:
             self.play(
                 self.camera.frame.animate.move_to(self.flow_function_camera_position),
+                Create(worklist_flow_function_title),
                 Create(condition_rectangle),
                 Transform(control_flow_modification, instance),
                 Transform(control_flow_modification_rectangle, instance_rectangle),
             )
         else:
             self.play(
+                Create(worklist_flow_function_title),
                 Transform(control_flow_modification, instance),
                 Transform(control_flow_modification_rectangle, instance_rectangle),
             )
@@ -474,13 +507,17 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         else:
             self.remove(instance_rectangle)
 
-        self.play(Uncreate(modification_rectangle))
+        self.play(
+            Uncreate(worklist_flow_function_title),
+            Uncreate(modification_rectangle),
+        )
 
     def show_control_flow_function_instance(
         self,
         control_flow_function_tex: AbstractEnvironmentUpdateInstances[L],
         flow_function_tex: AbstractEnvironmentUpdateInstances[L],
         instance_id: int | tuple[int, int],
+        program_point: ProgramPoint,
     ):
         if isinstance(instance_id, int):
             flow_instance_id = None
@@ -491,6 +528,21 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         condition = control_flow_function_tex.get_condition_part(instance_id)
         modification = control_flow_function_tex.get_modification_part(instance_id)
 
+        worklist_control_flow_function_title = Text(
+            self.worklist_control_flow_function_title_template.format(
+                program_point=str(program_point.point),
+                statement=str(program_point.statement.header),
+            )
+        )
+        self.scale_mobject(
+            worklist_control_flow_function_title,
+            self.control_flow_function_title_width,
+            self.control_flow_function_title_height,
+        )
+        worklist_control_flow_function_title.move_to(
+            self.control_flow_function_title_position
+        )
+
         instance_rectangle = SurroundingRectangle(instance)
         modification_rectangle = SurroundingRectangle(modification)
         if condition is not None:
@@ -499,9 +551,16 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
             condition_rectangle = None
 
         if condition_rectangle is not None:
-            self.play(Create(instance_rectangle), Create(condition_rectangle))
+            self.play(
+                Create(worklist_control_flow_function_title),
+                Create(instance_rectangle),
+                Create(condition_rectangle),
+            )
         else:
-            self.play(Create(instance_rectangle))
+            self.play(
+                Create(worklist_control_flow_function_title),
+                Create(instance_rectangle),
+            )
 
         self.wait(self.control_flow_function_highlight_wait_time)
 
@@ -533,26 +592,46 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
             self.show_flow_function_instance(
                 flow_function_tex,
                 flow_instance_id,
+                program_point.statement,
                 modification_copy,
                 modification_rectangle_copy,
             )
 
+            self.play(Uncreate(worklist_control_flow_function_title))
         else:
             if condition_rectangle is not None:
                 self.remove(instance_rectangle, condition_rectangle)
             else:
                 self.remove(instance_rectangle)
 
-            self.play(Uncreate(modification_rectangle))
+            self.play(
+                Uncreate(worklist_control_flow_function_title),
+                Uncreate(modification_rectangle),
+            )
 
     def show_condition_update_function_instance(
         self,
         condition_update_function_tex: AbstractEnvironmentUpdateInstances[L],
         instance_id: int,
+        condition_expression: E,
     ):
         instance = condition_update_function_tex.get_instance_part(instance_id)
         condition = condition_update_function_tex.get_condition_part(instance_id)
         modification = condition_update_function_tex.get_modification_part(instance_id)
+
+        worklist_condition_update_function_title = Text(
+            self.worklist_condition_update_function_title_template.format(
+                condition=str(condition_expression),
+            )
+        )
+        self.scale_mobject(
+            worklist_condition_update_function_title,
+            self.condition_update_function_title_width,
+            self.condition_update_function_title_height,
+        )
+        worklist_condition_update_function_title.move_to(
+            self.condition_update_function_title_position
+        )
 
         instance_rectangle = SurroundingRectangle(instance)
         modification_rectangle = SurroundingRectangle(modification)
@@ -562,9 +641,16 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
             condition_rectangle = None
 
         if condition_rectangle is not None:
-            self.play(Create(instance_rectangle), Create(condition_rectangle))
+            self.play(
+                Create(worklist_condition_update_function_title),
+                Create(instance_rectangle),
+                Create(condition_rectangle),
+            )
         else:
-            self.play(Create(instance_rectangle))
+            self.play(
+                Create(worklist_condition_update_function_title),
+                Create(instance_rectangle),
+            )
 
         self.wait(self.condition_update_function_highlight_wait_time)
 
@@ -585,7 +671,10 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         else:
             self.remove(instance_rectangle)
 
-        self.play(Uncreate(modification_rectangle))
+        self.play(
+            Uncreate(worklist_condition_update_function_title),
+            Uncreate(modification_rectangle),
+        )
 
     @contextmanager
     def animate_mobject(
@@ -702,11 +791,26 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         while worklist:
             program_point = worklist.pop()
 
+            worklist_pop_title = Text(
+                self.worklist_pop_title_template.format(
+                    program_point=str(program_point.point)
+                )
+            )
+            self.scale_mobject(
+                worklist_pop_title,
+                self.cfg_title_width,
+                self.cfg_title_height,
+            )
+            worklist_pop_title.move_to(self.cfg_title_position)
+
             worklist_program_point_rectangle = SurroundingRectangle(
                 worklist_tex.get_program_point_part(program_point)
             )
 
-            self.play(Create(worklist_program_point_rectangle))
+            self.play(
+                Create(worklist_pop_title),
+                Create(worklist_program_point_rectangle),
+            )
 
             table_program_point_rectangle = None
             program_point_rectangle = None
@@ -741,6 +845,8 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     table_program_point_animation,
                 )
 
+            self.wait(self.worklist_pop_wait_time)
+
             res, res_variables, res_instance_id = (
                 self.control_flow_function.apply_and_get_variables(
                     program_point, abstract_environments[program_point]
@@ -766,6 +872,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
             program_point_label = cfg.labels[program_point].copy()
 
             self.play(
+                Uncreate(worklist_pop_title),
                 Transform(program_point_label, control_flow_function_instance),
                 self.camera.frame.animate.move_to(
                     self.control_flow_function_camera_position
@@ -777,6 +884,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                 control_flow_function_tex,
                 flow_function_tex,
                 res_instance_id,
+                program_point,
             )
 
             with (
@@ -852,9 +960,11 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                         table_successor_program_point_animation,
                     )
 
+                condition: E = cond(program_cfg, program_point, successor)
+
                 res_cond, res_cond_variables, res_cond_instance_id = (
                     self.condition_update_function.apply_and_get_variables(
-                        cond(program_cfg, program_point, successor),
+                        condition,
                         res,
                     )
                 )
@@ -888,6 +998,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                 self.show_condition_update_function_instance(
                     condition_update_function_tex,
                     res_cond_instance_id,
+                    condition,
                 )
 
                 with (
@@ -929,7 +1040,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                 ):
                     condition_update_parts = tuple(
                         (
-                            table.get_variable_part(successor, variable).copy(),
+                            res_table.get_res_variable_part(variable).copy(),
                             res_table.get_res_cond_variable_part(variable),
                         )
                         for variable in variables
