@@ -24,72 +24,151 @@ from manim.mobject.text.code_mobject import Code
 from manim.mobject.text.text_mobject import Text
 from manim.animation.creation import Create, Uncreate, Write, Unwrite
 from manim.animation.transform import FadeTransform, Transform
-from manim.constants import LEFT, RIGHT, DOWN
 from manim.utils.color import ORANGE
 from contextlib import contextmanager
 from frozendict import frozendict
+from manim import config
 import networkx as nx
-import numpy as np
 
 
 L = TypeVar("L", bound=Hashable)
 E = TypeVar("E", bound=Hashable)
 
 
+def fw(scale_w: float):
+    return scale_w * config.frame_width
+
+
+def fh(scale_y: float):
+    return scale_y * config.frame_height
+
+
 class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
+    # Title
+    title: str = "Dataflow Analysis"
+    title_width: float = fw(0.5)
+    title_height: float = fh(0.5)
+    title_position: tuple[float, float, float] = (0, 0, 0)
+    title_camera_position: tuple[float, float, float] = (0, 0, 0)
     title_wait_time: float = 2.5
 
-    program_wait_time: float = 2.5
-
-    program_conversion_wait_time: float = 2.5
-
-    cfg_wait_time: float = 5.0
-
+    # Lattice
+    lattice: Lattice[L]
+    lattice_title: str = "Here is the lattice that we are going to use."
+    lattice_title_width: float = fw(0.95)
+    lattice_title_height: float = fh(0.175)
+    lattice_title_position: tuple[float, float, float] = (fw(1), fh(0.3875), 0)
+    lattice_width: float = fw(0.95)
+    lattice_height: float = fh(0.775)
+    lattice_position: tuple[float, float, float] = (fw(1), fh(-0.0775), 0)
+    lattice_camera_position: tuple[float, float, float] = (fw(1), 0, 0)
     lattice_wait_time: float = 5.0
-
+    lattice_max_horizontal_size_per_vertex: int = 8
+    lattice_max_vertical_size: int = 8
     lattice_transform_wait_time: float = 2.5
-
     lattice_join_wait_time: float = 5.0
-
-    flow_function_wait_time: float = 2.5
-
-    flow_function_set_wait_time: float = 2.5
-
-    control_flow_function_wait_time: float = 2.5
-
-    control_flow_function_highlight_wait_time: float = 2.5
-
-    control_flow_function_set_wait_time: float = 2.5
-
-    condition_update_function_wait_time: float = 2.5
-
-    condition_update_function_highlight_wait_time: float = 2.5
-
-    condition_update_function_set_wait_time: float = 2.5
-
     sorting_function: Callable[[Iterable[Hashable]], list[Hashable]] = (
         default_sorting_function
     )
 
-    title: str = "Dataflow Analysis"
+    # Control-flow function
+    control_flow_function: ControlFlowFunction[L]
+    control_flow_function_title: str = (
+        "We will use the following control-flow function."
+    )
+    control_flow_function_title_width: float = fw(0.95)
+    control_flow_function_title_height: float = fw(0.2)
+    control_flow_function_title_position: tuple[float, float, float] = (0, fh(-0.6), 0)
+    control_flow_function_width: float = fw(0.95)
+    control_flow_function_height: float = fh(0.8)
+    control_flow_function_position: tuple[float, float, float] = (0, fh(-1.1), 0)
+    control_flow_function_camera_position: tuple[float, float, float] = (0, fh(-1), 0)
+    control_flow_function_wait_time: float = 2.5
+    control_flow_function_highlight_wait_time: float = 2.5
+    control_flow_function_set_wait_time: float = 2.5
 
-    program_subtitle: str = "Here is the program that we are going to analyse."
+    # Flow function
+    flow_function_title: str = "And the following flow function"
+    flow_function_title_width: float = fw(0.95)
+    flow_function_title_height: float = fh(0.2)
+    flow_function_title_position: tuple[float, float, float] = (0, fh(-1.6), 0)
+    condition_update_function_width: float = fw(0.95)
+    condition_update_function_height: float = fh(0.8)
+    flow_function_position: tuple[float, float, float] = (0, fh(-2.1), 0)
+    flow_function_camera_position: tuple[float, float, float] = (0, fh(-2), 0)
+    flow_function_wait_time: float = 2.5
+    flow_function_set_wait_time: float = 2.5
 
-    program_conversion_subtitle: str = (
+    # Condition update function
+    condition_update_function: ConditionUpdateFunction[L, E]
+    condition_update_function_title: str = (
+        "We will also use this condition update function"
+    )
+    condition_update_function_title_width: float = fw(0.95)
+    condition_update_function_title_height: float = fh(0.2)
+    condition_update_function_title_position: tuple[float, float, float] = (
+        0,
+        fh(1.4),
+        0,
+    )
+    condition_update_function_width: float = fw(0.95)
+    condition_update_function_height: float = fh(0.8)
+    condition_update_function_position: tuple[float, float, float] = (0, fh(0.9), 0)
+    condition_update_function_camera_position: tuple[float, float, float] = (
+        0,
+        fh(1),
+        0,
+    )
+    condition_update_function_wait_time: float = 2.5
+    condition_update_function_highlight_wait_time: float = 2.5
+    condition_update_function_set_wait_time: float = 2.5
+
+    # Program
+    program: AstProgram
+    program_title: str = "Here is the program that we are going to analyse."
+    program_title_width: float = fw(0.95)
+    program_title_height: float = fh(0.2)
+    program_title_position: tuple[float, float, float] = (fw(-1), fh(0.4), 0)
+    program_width: float = fw(0.5)
+    program_height: float = fh(0.8)
+    program_position: tuple[float, float, float] = (fw(-1), fh(-0.1), 0)
+    program_camera_position: tuple[float, float, float] = (fw(-1), 0, 0)
+    program_wait_time: float = 2.5
+
+    # Program conversion
+    program_conversion_title: str = (
         "First, we need to convert it into a control flow graph."
     )
+    program_conversion_title_width: float = fw(0.95)
+    program_conversion_title_height: float = fh(0.2)
+    program_conversion_title_position: tuple[float, float, float] = (
+        fw(-0.45),
+        fh(0.4),
+        0,
+    )
+    program_new_width: float = fw(0.25)
+    program_new_height: float = fh(0.8)
+    program_new_position: tuple[float, float, float] = (fw(-0.75), fh(-0.1), 0)
+    program_arrow_start_position: tuple[float, float, float] = (fw(-0.6), fh(-0.1), 0)
+    program_arrow_end_position: tuple[float, float, float] = (fw(-0.5), fh(-0.1), 0)
+    program_conversion_camera_position: tuple[float, float, float] = (fw(-0.45), 0, 0)
+    program_conversion_wait_time: float = 2.5
 
-    program: AstProgram
+    # CFG
+    cfg_width: float = fw(0.45)
+    cfg_height: float = fh(0.8)
+    cfg_position: tuple[float, float, float] = (fw(-0.25), fh(-0.1), 0)
+    cfg_wait_time: float = 5.0
 
-    lattice: Lattice[L]
-
-    control_flow_function: ControlFlowFunction[L]
-
-    condition_update_function: ConditionUpdateFunction[L, E]
+    # Worklist
+    worklist_camera_position: tuple[float, float, float] = (0, 0, 0)
 
     def show_title(self) -> None:
         title = Text(self.title)
+
+        self.scale_mobject(title, self.title_width, self.title_height)
+        title.move_to(self.title_position)
 
         self.play(Write(title))
 
@@ -97,7 +176,143 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
         self.play(Unwrite(title))
 
-    def show_program(self, scale: float = 0.75) -> tuple[Code, Text]:
+    def create_lattice_graph(
+        self,
+        visible_vertices: set[L] | None = None,
+    ) -> LatticeGraph[L]:
+        lattice_graph = LatticeGraph.from_lattice(
+            self.lattice,
+            visible_vertices=visible_vertices,
+            max_horizontal_size_per_vertex=self.lattice_max_horizontal_size_per_vertex,
+            max_vertical_size=self.lattice_max_vertical_size,
+            layout_config=dict(sorting_function=type(self).sorting_function),
+        )
+
+        self.scale_mobject(lattice_graph, self.lattice_width, self.lattice_height)
+        lattice_graph.move_to(self.lattice_position)
+
+        return lattice_graph
+
+    def show_lattice_graph(self) -> LatticeGraph[L]:
+        lattice_title = Text(self.lattice_title)
+
+        self.scale_mobject(
+            lattice_title, self.lattice_title_width, self.lattice_title_height
+        )
+        lattice_title.move_to(self.lattice_title_position)
+
+        lattice_graph = self.create_lattice_graph()
+
+        self.play(Write(lattice_title), Create(lattice_graph))
+
+        self.wait(self.lattice_wait_time)
+
+        self.play(Unwrite(lattice_title))
+
+        return lattice_graph
+
+    def show_control_flow_function(self) -> AbstractEnvironmentUpdateInstances[L]:
+        control_flow_function_title = Text(self.control_flow_function_title)
+
+        self.scale_mobject(
+            control_flow_function_title,
+            self.control_flow_function_title_width,
+            self.control_flow_function_title_width,
+        )
+        control_flow_function_title.move_to(self.control_flow_function_title_position)
+
+        control_flow_function_tex = AbstractEnvironmentUpdateInstances(
+            self.control_flow_function.instances
+        )
+
+        self.scale_mobject(
+            control_flow_function_tex,
+            self.control_flow_function_width,
+            self.control_flow_function_height,
+        )
+        control_flow_function_tex.move_to(self.control_flow_function_position)
+
+        self.play(Create(control_flow_function_title))
+        self.play(Create(control_flow_function_tex))
+
+        self.wait(self.control_flow_function_wait_time)
+
+        self.play(Uncreate(control_flow_function_title))
+
+        return control_flow_function_tex
+
+    def show_flow_function(self) -> AbstractEnvironmentUpdateInstances[L]:
+        flow_function_title = Text(self.flow_function_title)
+
+        self.scale_mobject(
+            flow_function_title,
+            self.flow_function_title_width,
+            self.flow_function_title_width,
+        )
+        flow_function_title.move_to(self.flow_function_title_position)
+
+        flow_function_tex = AbstractEnvironmentUpdateInstances(
+            self.control_flow_function.flow_function.instances
+        )
+
+        self.scale_mobject(
+            flow_function_tex,
+            self.condition_update_function_width,
+            self.condition_update_function_height,
+        )
+        flow_function_tex.move_to(self.flow_function_position)
+
+        self.play(Create(flow_function_title))
+        self.play(Create(flow_function_tex))
+
+        self.wait(self.flow_function_wait_time)
+
+        self.play(Uncreate(flow_function_title))
+
+        return flow_function_tex
+
+    def show_condition_update_function(self) -> AbstractEnvironmentUpdateInstances[L]:
+        condition_update_function_title = Text(self.condition_update_function_title)
+
+        self.scale_mobject(
+            condition_update_function_title,
+            self.condition_update_function_title_width,
+            self.condition_update_function_title_width,
+        )
+        condition_update_function_title.move_to(
+            self.condition_update_function_title_position
+        )
+
+        condition_update_function_tex = AbstractEnvironmentUpdateInstances(
+            self.condition_update_function.instances
+        )
+
+        self.scale_mobject(
+            condition_update_function_tex,
+            self.condition_update_function_width,
+            self.condition_update_function_height,
+        )
+        condition_update_function_tex.move_to(self.condition_update_function_position)
+
+        self.play(Create(condition_update_function_title))
+        self.play(Create(condition_update_function_tex))
+
+        self.wait(self.condition_update_function_wait_time)
+
+        self.play(Uncreate(condition_update_function_title))
+
+        return condition_update_function_tex
+
+    def show_program(self) -> Code:
+        program_title = Text(self.program_title)
+
+        self.scale_mobject(
+            program_title,
+            self.program_title_width,
+            self.program_title_height,
+        )
+        program_title.move_to(self.program_title_position)
+
         program = Code(
             code=str(self.program),
             language="c",
@@ -106,119 +321,72 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
             font="Monospace",
             style="monokai",
         )
-        program.scale(scale)
 
-        program_subtitle = Text(self.program_subtitle)
-        program_subtitle.scale_to_fit_width(self.camera.frame_width * 0.8)
+        self.scale_mobject(program, self.program_width, self.program_height)
+        program.move_to(self.program_position)
 
-        program_subtitle.move_to(
-            self.camera.frame_height * np.array([0, 0.5, 0]) + DOWN
-        )
-
-        self.play(Write(program_subtitle))
-
-        self.play(Create(program))
+        self.play(Write(program_title), Create(program))
 
         self.wait(self.program_wait_time)
 
-        return program, program_subtitle
+        new_program = program.copy()
 
-    def show_cfg(
-        self, position: tuple[int, int, int] = (0, 0, 0), scale: float = 0.5
+        self.scale_mobject(
+            new_program,
+            self.program_new_width,
+            self.program_new_height,
+        )
+        new_program.move_to(self.program_new_position)
+
+        self.play(Unwrite(program_title), Transform(program, new_program))
+
+        self.remove(program)
+        self.add(new_program)
+
+        return new_program
+
+    def show_program_conversion(
+        self, program: Code
     ) -> tuple[ProgramPoint, nx.DiGraph[ProgramPoint], ControlFlowGraph]:
+        arrow = Arrow(
+            start=self.program_arrow_start_position,
+            end=self.program_arrow_end_position,
+        )
+
+        program_conversion_title = Text(self.program_conversion_title)
+
+        self.scale_mobject(
+            program_conversion_title,
+            self.program_conversion_title_width,
+            self.program_conversion_title_height,
+        )
+        program_conversion_title.move_to(self.program_conversion_title_position)
+
         entry_point, program_cfg = self.program.to_cfg()
 
         cfg = ControlFlowGraph.from_cfg(entry_point, program_cfg)
 
-        cfg.move_to(position)
-        cfg.scale(scale)
+        self.scale_mobject(cfg, self.cfg_width, self.cfg_height)
+        cfg.move_to(self.cfg_position)
 
+        self.play(Write(program_conversion_title))
+        self.play(Create(arrow))
         self.play(Create(cfg))
-
-        self.wait(self.cfg_wait_time)
-
-        return entry_point, program_cfg, cfg
-
-    def show_program_conversion(
-        self, program: Code, program_subtitle: Text
-    ) -> tuple[ProgramPoint, nx.DiGraph[ProgramPoint], ControlFlowGraph]:
-        self.play(Unwrite(program_subtitle))
-
-        program_conversion_subtitle = Text(self.program_conversion_subtitle)
-        program_conversion_subtitle.scale_to_fit_width(self.camera.frame_width * 0.8)
-        program_conversion_subtitle.move_to(program_subtitle.get_center())
-
-        self.play(Write(program_conversion_subtitle))
 
         self.wait(self.program_conversion_wait_time)
 
-        self.play(
-            program.animate.move_to(self.camera.frame_width * np.array([-0.25, 0, 0]))
-        )
+        self.remove(program)
 
-        arrow = Arrow(start=LEFT, end=RIGHT)
-
-        self.play(Create(arrow))
-
-        entry_point, program_cfg, cfg = self.show_cfg(
-            position=program.get_right() + RIGHT * 5, scale=0.33
-        )
-
-        self.play(Uncreate(arrow))
-
-        self.remove(program_cfg)
+        self.play(Uncreate(arrow), Uncreate(program), Unwrite(program_conversion_title))
 
         return entry_point, program_cfg, cfg
-
-    def create_lattice_graph(
-        self,
-        position: tuple[int, int, int] = (0, 0, 0),
-        scale: float = 0.25,
-        visible_vertices: set[L] | None = None,
-        max_horizontal_size_per_vertex: int = 8,
-        max_vertical_size: int = 8,
-    ) -> LatticeGraph[L]:
-        lattice_graph = LatticeGraph.from_lattice(
-            self.lattice,
-            visible_vertices=visible_vertices,
-            max_horizontal_size_per_vertex=max_horizontal_size_per_vertex,
-            max_vertical_size=max_vertical_size,
-            layout_config=dict(sorting_function=type(self).sorting_function),
-        )
-
-        lattice_graph.move_to(position)
-        lattice_graph.scale(scale)
-
-        return lattice_graph
-
-    def show_lattice_graph(
-        self,
-        position: tuple[int, int, int] = (0, 0, 0),
-        scale: float = 0.25,
-        visible_vertices: set[L] | None = None,
-        max_horizontal_size_per_vertex: int = 8,
-        max_vertical_size: int = 8,
-    ) -> LatticeGraph[L]:
-        lattice_graph = self.create_lattice_graph(
-            position=position,
-            scale=scale,
-            visible_vertices=visible_vertices,
-            max_horizontal_size_per_vertex=max_horizontal_size_per_vertex,
-            max_vertical_size=max_vertical_size,
-        )
-
-        self.play(Create(lattice_graph))
-
-        self.wait(self.lattice_wait_time)
-
-        return lattice_graph
 
     def show_lattice_join(
         self,
         lattice_graph: LatticeGraph[L],
         value1: L,
         value2: L,
-        position: tuple[int, int, int] = (0, 0, 0),
+        position: tuple[float, float, float] = (0, 0, 0),
         scale: float = 0.25,
         max_horizontal_size_per_vertex: int = 8,
         max_vertical_size: int = 8,
@@ -540,19 +708,11 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
         table = self.create_worklist_table(variables, abstract_environments)
 
-        self.scale_mobject(
-            cfg,
-            self.camera.frame_width * 0.45,
-            self.camera.frame_height,
-        )
-
-        cfg.move_to((self.camera.frame_width * -0.25, 0, 0))
-
         res_table = self.create_res_table(variables)
 
         worklist_tex = self.create_worklist_tex(worklist)
 
-        self.play(Create(table), Create(cfg), Create(res_table), Create(worklist_tex))
+        self.play(Create(table), Create(res_table), Create(worklist_tex))
 
         while worklist:
             program_point = worklist.pop()
@@ -600,15 +760,15 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                 program_point, abstract_environments[program_point]
             )
 
-            self.camera.frame.save_state()
+            # self.camera.frame.save_state()
 
-            self.play(
-                self.camera.frame.animate.move_to((0, -self.camera.frame_height, 0))
-            )
+            # self.play(
+            #    self.camera.frame.animate.move_to((0, -self.camera.frame_height, 0))
+            # )
 
-            self.show_control_flow_function_instance(res_instance_id)
+            # self.show_control_flow_function_instance(res_instance_id)
 
-            self.play(self.camera.frame.animate.restore())
+            # self.play(self.camera.frame.animate.restore())
 
             with (
                 self.animate_mobject(
@@ -650,15 +810,15 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                         table_successor_program_point_animation,
                     )
 
-                self.camera.frame.save_state()
+                # self.camera.frame.save_state()
 
-                self.play(
-                    self.camera.frame.animate.move_to((0, self.camera.frame_height, 0))
-                )
+                # self.play(
+                #    self.camera.frame.animate.move_to((0, self.camera.frame_height, 0))
+                # )
 
-                self.show_condition_update_function_instance(res_cond_instance_id)
+                # self.show_condition_update_function_instance(res_cond_instance_id)
 
-                self.play(self.camera.frame.animate.restore())
+                # self.play(self.camera.frame.animate.restore())
 
                 with (
                     self.animate_mobject(
@@ -762,19 +922,45 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                 )
 
     def construct(self):
+        self.play(self.camera.frame.animate.move_to(self.title_camera_position))
+
         self.show_title()
 
-        program, program_subtitle = self.show_program()
-
-        entry_point, program_cfg, cfg = self.show_program_conversion(
-            program, program_subtitle
-        )
-
-        self.clear()
+        self.play(self.camera.frame.animate.move_to(self.lattice_camera_position))
 
         lattice_graph = self.show_lattice_graph()
 
-        self.clear()
+        self.play(
+            self.camera.frame.animate.move_to(
+                self.control_flow_function_camera_position
+            )
+        )
+
+        control_flow_function_tex = self.show_control_flow_function()
+
+        self.play(self.camera.frame.animate.move_to(self.flow_function_camera_position))
+
+        flow_function_tex = self.show_flow_function()
+
+        self.play(
+            self.camera.frame.animate.move_to(
+                self.condition_update_function_camera_position
+            )
+        )
+
+        condition_update_function_tex = self.show_condition_update_function()
+
+        self.play(self.camera.frame.animate.move_to(self.program_camera_position))
+
+        program = self.show_program()
+
+        self.play(
+            self.camera.frame.animate.move_to(self.program_conversion_camera_position)
+        )
+
+        entry_point, program_cfg, cfg = self.show_program_conversion(program)
+
+        self.play(self.camera.frame.animate.move_to(self.worklist_camera_position))
 
         self.worklist(
             entry_point,
