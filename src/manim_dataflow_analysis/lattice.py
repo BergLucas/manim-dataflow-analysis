@@ -812,23 +812,23 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                         if lattice.is_predecessor(visible_vertex, connection):
                             edges.add((visible_vertex, connection))
                         else:
-                            infinite_vertex = InfiniteNode(connection)
-                            vertices.add(infinite_vertex)
+                            connection_infinite_vertex = InfiniteNode(connection)
+                            vertices.add(connection_infinite_vertex)
                             edges.update(
                                 (
-                                    (visible_vertex, infinite_vertex),
-                                    (infinite_vertex, connection),
+                                    (visible_vertex, connection_infinite_vertex),
+                                    (connection_infinite_vertex, connection),
                                 )
                             )
                     elif lattice.is_successor(connection, visible_vertex):
                         edges.add((connection, visible_vertex))
                     else:
-                        infinite_vertex = InfiniteNode(connection)
-                        vertices.add(infinite_vertex)
+                        connection_infinite_vertex = InfiniteNode(connection)
+                        vertices.add(connection_infinite_vertex)
                         edges.update(
                             (
-                                (connection, infinite_vertex),
-                                (infinite_vertex, visible_vertex),
+                                (connection, connection_infinite_vertex),
+                                (connection_infinite_vertex, visible_vertex),
                             )
                         )
 
@@ -1095,9 +1095,9 @@ class LatticeGraph(Generic[L], BetterDiGraph):
     ):
         path = nx.shortest_path(self._graph, start, end)
 
-        for start, end in zip(path, path[1:]):
-            mobject = self.vertices[start]
-            edge_mobject = self.edges[(start, end)]
+        for start_element, end_element in zip(path, path[1:]):
+            mobject = self.vertices[start_element]
+            edge_mobject = self.edges[(start_element, end_element)]
 
             mobject.color = color
             for submobject in mobject.submobjects:

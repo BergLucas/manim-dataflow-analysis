@@ -83,7 +83,7 @@ class BetterDiGraph(DiGraph):
     def _populate_edge_dict(
         self, edges: list[tuple[Hashable, Hashable]], edge_type: type[TipableVMobject]
     ):
-        # Some part of this method is copied from manim.mobject.graph.GenericGraph._populate_edge_dict
+        # Some part of this method is copied from manim.mobject.graph.GenericGraph._populate_edge_dict  # noqa: E501
 
         self.edges = {
             (u, v): self._create_edge_mobject(
@@ -96,7 +96,7 @@ class BetterDiGraph(DiGraph):
             edge.add_tip(**self._tip_config[(u, v)])
 
     def update_edges(self, graph: nx.DiGraph):
-        # Some part of this method is copied from manim.mobject.graph.DiGraph.update_edges
+        # Some part of this method is copied from manim.mobject.graph.DiGraph.update_edges  # noqa: E501
 
         edge: TipableVMobject
         for (u, v), edge in graph.edges.items():
@@ -114,7 +114,7 @@ class BetterDiGraph(DiGraph):
         edge_type: type[TipableVMobject] = TipableVMobject,
         edge_config: dict | None = None,
     ):
-        # Some part of this method is copied from manim.mobject.graph.GenericGraph._add_edge
+        # Some part of this method is copied from manim.mobject.graph.GenericGraph._add_edge  # noqa: E501
 
         if edge_config is None:
             edge_config = self.default_edge_config.copy()

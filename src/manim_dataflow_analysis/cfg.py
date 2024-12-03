@@ -123,7 +123,7 @@ def __cfg_successors(
 
     if set(successors) != set(successors_condition):
         raise ValueError(
-            f"The successors of the vertex {vertex} are not the same as the condition vertices"
+            f"The successors of the vertex {vertex} are not the same as the condition vertices"  # noqa: E501
         )
 
     return list(successors_condition)

@@ -43,7 +43,6 @@ source = ["src/image_analyst", "tests"]
 
 [tool.ruff.lint]
 select = [
-    "D",   # pydocstyle
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
     "F",   # pyflakes
@@ -56,7 +55,7 @@ select = [
     "PL",  # pylint
 ]
 
-ignore = ["E203", "D100", "D101", "D104", "D105", "D106", "N818"]
+ignore = ["E203", "N818", "C901", "PLR0912", "PLR0913", "PLR0915"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
