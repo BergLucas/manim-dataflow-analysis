@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import TypeVar, Generic, Hashable, Collection, Iterable, Callable, Generator
 from manim.scene.zoomed_scene import MovingCameraScene
 from manim.mobject.mobject import Mobject
-from manim_dataflow_analysis.ast import AstProgram, AstStatement
+from manim_dataflow_analysis.ast import AstFunction, AstStatement
 from manim_dataflow_analysis.cfg import ControlFlowGraph, ProgramPoint, succ, cond
 from manim_dataflow_analysis.condition_update_function import ConditionUpdateFunction
 from manim_dataflow_analysis.lattice import (
@@ -135,7 +135,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     condition_update_function_set_wait_time: float = 2.5
 
     # Program
-    program: AstProgram
+    program: AstFunction
     program_title: str = "Here is the program that we are going to analyse :"
     program_title_width: float = fw(0.95)
     program_title_height: float = fh(0.175)
@@ -203,10 +203,10 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         "We update the rest of the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the res abstract environment :"
     )
     worklist_is_included_title_template: str = (
-        "res[COND(p,p')] is included in the abstract environment {successor_point}\nso we reached a fixed point :"
+        "res[COND(p,p')] is included in the abstract environment {successor_program_point}\nso we reached a fixed point :"
     )
     worklist_not_included_title_template: str = (
-        "res[COND(p,p')] is not included in the abstract environment {successor_point}\nso we must process the successor {successor_program_point} :"
+        "res[COND(p,p')] is not included in the abstract environment {successor_program_point}\nso we must process the successor {successor_program_point} :"
     )
     worklist_joined_values_title_template: str = (
         "We join the values from the abstract environment res[COND(p,p')] with\nthe abstract environment {program_point} :"
@@ -762,7 +762,6 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
     def worklist(
         self,
-        variables: Collection[str],
         entry_point: ProgramPoint,
         program_cfg: nx.DiGraph[ProgramPoint],
         cfg: ControlFlowGraph,
@@ -774,10 +773,23 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         abstract_environments = {
             p: AbstractEnvironment(
                 self.lattice,
-                frozendict((variable, self.lattice.bottom()) for variable in variables),
+                frozendict(
+                    (
+                        *(
+                            (variable, self.lattice.bottom())
+                            for variable in self.program.variables
+                        ),
+                        *(
+                            (parameter, self.lattice.top())
+                            for parameter in self.program.parameters
+                        ),
+                    )
+                ),
             )
             for p in program_cfg.nodes
         }
+
+        variables = self.program.variables.union(self.program.parameters)
 
         worklist = {entry_point}
 
@@ -1470,7 +1482,6 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         self.play(self.camera.frame.animate.move_to(self.worklist_camera_position))
 
         self.worklist(
-            self.program.variables,
             entry_point,
             program_cfg,
             cfg,

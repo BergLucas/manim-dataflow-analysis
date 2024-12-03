@@ -29,16 +29,25 @@ class AstStatement(Protocol):
         """
 
 
-class AstProgram(Protocol):
-    """A program in its AST form."""
+class AstFunction(Protocol):
+    """A function in its AST form."""
 
     @property
     @abstractmethod
-    def language(self) -> str:
-        """The language of the AST program.
+    def name(self) -> str:
+        """The name of the AST function.
 
         Returns:
-            The language of the AST program.
+            The name of the AST function.
+        """
+
+    @property
+    @abstractmethod
+    def parameters(self) -> tuple[str, ...]:
+        """The parameters of the AST function.
+
+        Returns:
+            The parameters of the AST function.
         """
 
     @property
