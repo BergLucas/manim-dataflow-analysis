@@ -266,7 +266,7 @@ def lattice_layout(
         scale_x = scale
         scale_y = scale
     elif isinstance(scale, tuple):
-        scale_x, scale_y = scale
+        scale_x, scale_y, _ = scale
     else:
         scale_x = scale_y = 1
 
@@ -291,7 +291,7 @@ def lattice_layout(
     for vertex, height in vertices_heights.items():
         heights_layer[height].append(vertex)
 
-    coords: dict[Hashable, (int, int)] = {}
+    coords: dict[Hashable, tuple[float, float]] = {}
     for height, vertices in heights_layer.items():
         for i, vertex in enumerate(sorting_function(vertices)):
             coords[vertex] = (i - len(vertices) / 2, height)
@@ -321,7 +321,7 @@ class InfiniteNode(Generic[L]):
 
 @total_ordering
 @dataclass(frozen=True, order=False)
-class IncompleteNode(Generic[L]):
+class IncompleteNode:
     depth: int
     invert_direction: bool
 
@@ -376,19 +376,19 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         if visible_vertices is None:
             visible_vertices = set()
 
-        vertices: set[L | InfiniteNode[L] | IncompleteNode[L]] = set()
+        vertices: set[L | InfiniteNode[L] | IncompleteNode | BridgeNode[L]] = set()
         bottom_infinite_vertices: dict[InfiniteNode[L], set[L]] = {}
         top_infinite_vertices: dict[InfiniteNode[L], set[L]] = {}
         bottom_incomplete_vertices: dict[
-            IncompleteNode, set[tuple[L, bool]]
+            IncompleteNode, set[tuple[L | InfiniteNode[L] | IncompleteNode, bool]]
         ] = defaultdict(set)
         top_incomplete_vertices: dict[
-            IncompleteNode, set[tuple[L, bool]]
+            IncompleteNode, set[tuple[L | InfiniteNode[L] | IncompleteNode, bool]]
         ] = defaultdict(set)
         edges: set[
             tuple[
-                L | InfiniteNode[L] | IncompleteNode[L],
-                L | InfiniteNode[L] | IncompleteNode[L],
+                L | InfiniteNode[L] | IncompleteNode | BridgeNode[L],
+                L | InfiniteNode[L] | IncompleteNode | BridgeNode[L],
             ]
         ] = set()
 
@@ -568,14 +568,14 @@ class LatticeGraph(Generic[L], BetterDiGraph):
 
         if isinstance(labels, bool) and labels:
             labels = {}
-            for vertex in vertices:
-                text = Text(str(vertex), fill_color=label_fill_color)
+            for label_vertex in vertices:
+                text = Text(str(label_vertex), fill_color=label_fill_color)
                 text.scale(labels_size * layout_scale / max(text.width, text.height))
-                labels[vertex] = text
+                labels[label_vertex] = text
 
         return cls(
-            vertices,
-            edges,
+            list(vertices),
+            list(edges),
             labels,
             label_fill_color=label_fill_color,
             layout_scale=layout_scale,
@@ -607,11 +607,13 @@ class LatticeGraph(Generic[L], BetterDiGraph):
     def _create_incomplete_vertex(
         cls,
         lattice: Lattice[L],
-        incomplete_vertices: dict[IncompleteNode, set[tuple[L, bool]]],
+        incomplete_vertices: dict[
+            IncompleteNode, set[tuple[L | InfiniteNode[L] | IncompleteNode, bool]]
+        ],
         edges: set[
             tuple[
-                L | InfiniteNode[L] | IncompleteNode[L],
-                L | InfiniteNode[L] | IncompleteNode[L],
+                L | InfiniteNode[L] | IncompleteNode | BridgeNode[L],
+                L | InfiniteNode[L] | IncompleteNode | BridgeNode[L],
             ]
         ],
         vertex: L,
@@ -621,12 +623,24 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         if invert_direction:
             incomplete = lattice.has_other_successors_than(
                 vertex,
-                {end for start, end in edges if start == vertex},
+                {
+                    end
+                    for start, end in edges
+                    if start == vertex
+                    and not isinstance(end, (InfiniteNode, IncompleteNode, BridgeNode))
+                },
             )
         else:
             incomplete = lattice.has_other_predecessors_than(
                 vertex,
-                {start for start, end in edges if end == vertex},
+                {
+                    start
+                    for start, end in edges
+                    if end == vertex
+                    and not isinstance(
+                        start, (InfiniteNode, IncompleteNode, BridgeNode)
+                    )
+                },
             )
 
         if not incomplete:
@@ -653,7 +667,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         infinite_vertices: dict[InfiniteNode[L], set[L]],
         vertex: L,
         invert_direction: bool,
-    ) -> bool:
+    ) -> None:
         for infinite_vertex in infinite_vertices:
             if invert_direction:
                 closest_connection = lattice.meet(vertex, infinite_vertex.base_node)
@@ -675,12 +689,12 @@ class LatticeGraph(Generic[L], BetterDiGraph):
     def _add_children_to_worklist(
         cls,
         children: set[L],
-        vertices: set[L | InfiniteNode[L] | IncompleteNode[L]],
+        vertices: set[L | InfiniteNode[L] | IncompleteNode | BridgeNode[L]],
         worklist: list[tuple[L, bool, int]],
         edges: set[
             tuple[
-                L | InfiniteNode[L] | IncompleteNode[L],
-                L | InfiniteNode[L] | IncompleteNode[L],
+                L | InfiniteNode[L] | IncompleteNode | BridgeNode[L],
+                L | InfiniteNode[L] | IncompleteNode | BridgeNode[L],
             ]
         ],
         vertex: L,
@@ -703,7 +717,9 @@ class LatticeGraph(Generic[L], BetterDiGraph):
     @classmethod
     def _create_incomplete_vertices(
         cls,
-        incomplete_vertices: dict[IncompleteNode, set[tuple[L, bool]]],
+        incomplete_vertices: dict[
+            IncompleteNode, set[tuple[L | InfiniteNode[L] | IncompleteNode, bool]]
+        ],
         vertex: L,
         children_depth: int,
         invert_direction: bool,
@@ -727,14 +743,14 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         cls,
         lattice: Lattice[L],
         infinite_vertices: dict[InfiniteNode[L], set[L]],
-        vertices: set[L | InfiniteNode[L] | IncompleteNode[L]],
+        vertices: set[L | InfiniteNode[L] | IncompleteNode | BridgeNode[L]],
         edges: set[
             tuple[
-                L | InfiniteNode[L] | IncompleteNode[L],
-                L | InfiniteNode[L] | IncompleteNode[L],
+                L | InfiniteNode[L] | IncompleteNode | BridgeNode[L],
+                L | InfiniteNode[L] | IncompleteNode | BridgeNode[L],
             ]
         ],
-        unprocessed_visible_vertices: list[L],
+        unprocessed_visible_vertices: set[L],
         invert_direction: bool,
     ) -> None:
         for infinite_vertex, infinite_connections in infinite_vertices.items():
@@ -836,13 +852,15 @@ class LatticeGraph(Generic[L], BetterDiGraph):
     def _create_infinite_edges(
         cls,
         infinite_vertices: dict[InfiniteNode[L], set[L]],
-        incomplete_vertices: dict[IncompleteNode, set[tuple[L, bool]]],
+        incomplete_vertices: dict[
+            IncompleteNode, set[tuple[L | InfiniteNode[L] | IncompleteNode, bool]]
+        ],
         half_vertical_size: int,
-        vertices: set[L | InfiniteNode[L] | IncompleteNode[L]],
+        vertices: set[L | InfiniteNode[L] | IncompleteNode | BridgeNode[L]],
         edges: set[
             tuple[
-                L | InfiniteNode[L] | IncompleteNode[L],
-                L | InfiniteNode[L] | IncompleteNode[L],
+                L | InfiniteNode[L] | IncompleteNode | BridgeNode[L],
+                L | InfiniteNode[L] | IncompleteNode | BridgeNode[L],
             ]
         ],
         invert_direction: bool,
@@ -875,13 +893,15 @@ class LatticeGraph(Generic[L], BetterDiGraph):
     def _create_incomplete_edges(
         cls,
         lattice: Lattice[L],
-        incomplete_vertices: dict[IncompleteNode, set[tuple[L, bool]]],
+        incomplete_vertices: dict[
+            IncompleteNode, set[tuple[L | InfiniteNode[L] | IncompleteNode, bool]]
+        ],
         infinite_vertices: dict[InfiniteNode[L], set[L]],
-        vertices: set[L | InfiniteNode[L] | IncompleteNode[L]],
+        vertices: set[L | InfiniteNode[L] | IncompleteNode | BridgeNode[L]],
         edges: set[
             tuple[
-                L | InfiniteNode[L] | IncompleteNode[L],
-                L | InfiniteNode[L] | IncompleteNode[L],
+                L | InfiniteNode[L] | IncompleteNode | BridgeNode[L],
+                L | InfiniteNode[L] | IncompleteNode | BridgeNode[L],
             ]
         ],
         invert_direction: bool,
@@ -926,11 +946,11 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         lattice: Lattice[L],
         bottom_infinite_vertices: dict[InfiniteNode[L], set[L]],
         top_infinite_vertices: dict[InfiniteNode[L], set[L]],
-        vertices: set[L | InfiniteNode[L] | IncompleteNode[L]],
+        vertices: set[L | InfiniteNode[L] | IncompleteNode | BridgeNode[L]],
         edges: set[
             tuple[
-                L | InfiniteNode[L] | IncompleteNode[L],
-                L | InfiniteNode[L] | IncompleteNode[L],
+                L | InfiniteNode[L] | IncompleteNode | BridgeNode[L],
+                L | InfiniteNode[L] | IncompleteNode | BridgeNode[L],
             ]
         ],
         final_visible_vertices: set[L],
@@ -991,8 +1011,10 @@ class LatticeGraph(Generic[L], BetterDiGraph):
 
                     visible_vertex_connections.add(connection)
 
-                    if not connected_to_incomplete_vertex and lattice.contains(
-                        visible_vertex, connection
+                    if (
+                        not connected_to_incomplete_vertex
+                        and not isinstance(connection, InfiniteNode)
+                        and lattice.contains(visible_vertex, connection)
                     ):
                         connections.remove(connection)
 
@@ -1000,7 +1022,12 @@ class LatticeGraph(Generic[L], BetterDiGraph):
 
         for vertex, connections in vertices_connections.items():
             for connection in connections:
-                if final_visible_vertices and (connection, vertex) in bridge_vertices:
+                if (
+                    final_visible_vertices
+                    and (connection, vertex) in bridge_vertices
+                    and isinstance(vertex, InfiniteNode)
+                    and isinstance(connection, InfiniteNode)
+                ):
                     bridge_vertex = BridgeNode(connection, vertex)
                     vertices.add(bridge_vertex)
                     edges.update(

@@ -131,7 +131,7 @@ class BetterDiGraph(DiGraph):
         edge_config = base_edge_config
         self._edge_config[(u, v)] = edge_config
 
-        edge_mobject = self._create_edge_mobject(u, v, edge_type, edge_config)
+        edge_mobject = self._create_edge_mobject(u, v, edge_type, edge_config)  # type: ignore
         self.edges[(u, v)] = edge_mobject
 
         self.add(edge_mobject)

@@ -4,10 +4,10 @@ from typing import Mapping, Protocol, Sequence, TypeVar
 from manim_dataflow_analysis.abstract_environment import AbstractEnvironment
 
 L = TypeVar("L")
-E = TypeVar("E")
+E_contra = TypeVar("E_contra", contravariant=True)
 
 
-class ConditionUpdateFunction(Protocol[L, E]):
+class ConditionUpdateFunction(Protocol[L, E_contra]):
     @property
     @abstractmethod
     def instances(self) -> Sequence[tuple[str, str, str | None]]:
@@ -16,14 +16,14 @@ class ConditionUpdateFunction(Protocol[L, E]):
     @abstractmethod
     def get_variables(
         self,
-        expression: E,
+        expression: E_contra,
         abstract_environment: AbstractEnvironment[L],
     ) -> tuple[Mapping[str, L], int]:
         ...
 
     def apply(
         self,
-        expression: E,
+        expression: E_contra,
         abstract_environment: AbstractEnvironment[L],
     ) -> tuple[AbstractEnvironment[L], int]:
         variables, instance_id = self.get_variables(expression, abstract_environment)
@@ -31,7 +31,7 @@ class ConditionUpdateFunction(Protocol[L, E]):
 
     def apply_and_get_variables(
         self,
-        expression: E,
+        expression: E_contra,
         abstract_environment: AbstractEnvironment[L],
     ) -> tuple[AbstractEnvironment[L], Mapping[str, L], int]:
         variables, instance_id = self.get_variables(expression, abstract_environment)

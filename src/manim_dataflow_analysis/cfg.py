@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Hashable, Iterable, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Hashable, Iterable, Protocol, cast
 
 import networkx as nx
 import numpy as np
@@ -49,7 +49,7 @@ class PathArrow(TipableVMobject):
         return self
 
     def get_length(self) -> np.floating:
-        length = 0
+        length: np.floating = np.floating(0.0)
         for i in range(len(self.path) - 1):
             length += np.linalg.norm(
                 np.array(self.path[i]) - np.array(self.path[i + 1])
@@ -264,7 +264,7 @@ def cfg_layout(
         scale_x = scale
         scale_y = scale
     elif isinstance(scale, tuple):
-        scale_x, scale_y = scale
+        scale_x, scale_y, _ = scale
     else:
         scale_x = scale_y = 1
 
@@ -387,6 +387,7 @@ class ControlFlowGraph(BetterDiGraph):
         edge_cases: defaultdict[ProgramPoint, dict[ProgramPoint, int]] = defaultdict(
             dict
         )
+        case: int
         for start, end, case in cfg.edges.data("case"):
             if case is not None:
                 edge_cases[start][end] = case
@@ -526,12 +527,9 @@ def pred(
     return graph.predecessors(program_point)
 
 
-E = TypeVar("E")
-
-
 def cond(
     graph: nx.DiGraph[ProgramPoint],
     start_program_point: ProgramPoint,
     end_program_point: ProgramPoint,
-) -> E:
+) -> Any:
     return graph.get_edge_data(start_program_point, end_program_point)["condition"]

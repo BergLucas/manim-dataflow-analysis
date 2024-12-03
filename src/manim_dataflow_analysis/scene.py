@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from copy import deepcopy
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -116,8 +117,6 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     flow_function_title_width: float = fw(0.95)
     flow_function_title_height: float = fh(0.175)
     flow_function_title_position: tuple[float, float, float] = (0, fh(-1.6125), 0)
-    condition_update_function_width: float = fw(0.95)
-    condition_update_function_height: float = fh(0.775)
     flow_function_position: tuple[float, float, float] = (0, fh(-2.0775), 0)
     flow_function_camera_position: tuple[float, float, float] = (0, fh(-2), 0)
     flow_function_wait_time: float = 5.0
@@ -269,7 +268,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
         return lattice_graph
 
-    def show_control_flow_function(self) -> AbstractEnvironmentUpdateInstances[L]:
+    def show_control_flow_function(self) -> AbstractEnvironmentUpdateInstances:
         control_flow_function_title = Text(self.control_flow_function_title)
 
         self.scale_mobject(
@@ -299,7 +298,10 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
         return control_flow_function_tex
 
-    def show_flow_function(self) -> AbstractEnvironmentUpdateInstances[L]:
+    def show_flow_function(self) -> AbstractEnvironmentUpdateInstances | None:
+        if self.control_flow_function.flow_function is None:
+            return None
+
         flow_function_title = Text(self.flow_function_title)
 
         self.scale_mobject(
@@ -329,7 +331,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
         return flow_function_tex
 
-    def show_condition_update_function(self) -> AbstractEnvironmentUpdateInstances[L]:
+    def show_condition_update_function(self) -> AbstractEnvironmentUpdateInstances:
         condition_update_function_title = Text(self.condition_update_function_title)
 
         self.scale_mobject(
@@ -441,7 +443,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
     def show_flow_function_instance(
         self,
-        flow_function_tex: AbstractEnvironmentUpdateInstances[L],
+        flow_function_tex: AbstractEnvironmentUpdateInstances,
         instance_id: int,
         statement: AstStatement,
         control_flow_modification: VMobject,
@@ -511,8 +513,8 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
     def show_control_flow_function_instance(
         self,
-        control_flow_function_tex: AbstractEnvironmentUpdateInstances[L],
-        flow_function_tex: AbstractEnvironmentUpdateInstances[L],
+        control_flow_function_tex: AbstractEnvironmentUpdateInstances,
+        flow_function_tex: AbstractEnvironmentUpdateInstances,
         instance_id: int | tuple[int, int],
         program_point: ProgramPoint,
     ):
@@ -608,7 +610,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
     def show_condition_update_function_instance(
         self,
-        condition_update_function_tex: AbstractEnvironmentUpdateInstances[L],
+        condition_update_function_tex: AbstractEnvironmentUpdateInstances,
         instance_id: int,
         condition_expression: E,
     ):
@@ -684,11 +686,11 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
             self.remove(previous_mobject)
             self.add(new_mobject)
         elif previous_mobject is not None and new_mobject is None:
-            yield Uncreate(previous_mobject), None
+            yield Uncreate(previous_mobject), new_mobject  # type: ignore[misc]
         elif new_mobject is not None and previous_mobject is None:
             yield Create(new_mobject), new_mobject
         else:
-            yield None, None
+            yield None, new_mobject
 
     def scale_mobject(self, mobject: Mobject, max_x: float, max_y: float) -> None:
         if mobject.width >= mobject.height:
@@ -761,9 +763,9 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         program_cfg: nx.DiGraph[ProgramPoint],
         cfg: ControlFlowGraph,
         lattice_graph: LatticeGraph[L],
-        control_flow_function_tex: AbstractEnvironmentUpdateInstances[L],
-        flow_function_tex: AbstractEnvironmentUpdateInstances[L],
-        condition_update_function_tex: AbstractEnvironmentUpdateInstances[L],
+        control_flow_function_tex: AbstractEnvironmentUpdateInstances,
+        flow_function_tex: AbstractEnvironmentUpdateInstances,
+        condition_update_function_tex: AbstractEnvironmentUpdateInstances,
     ):
         abstract_environments = {
             p: AbstractEnvironment(
@@ -879,7 +881,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     flow_instance_id
                 )
 
-            program_point_label = cfg.labels[program_point].copy()
+            program_point_label = deepcopy(cfg.labels[program_point])
 
             self.add(control_flow_function_tex, flow_function_tex)
 
@@ -1047,8 +1049,8 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     res,
                 )
 
-                program_point_label = cfg.labels[program_point].copy()
-                successor_program_point_label = cfg.labels[successor].copy()
+                program_point_label = deepcopy(cfg.labels[program_point])
+                successor_program_point_label = deepcopy(cfg.labels[successor])
 
                 condition_update_function_instance = (
                     condition_update_function_tex.get_instance_part(
@@ -1301,9 +1303,9 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
                         self.wait(self.lattice_join_wait_time)
 
-                        lattice_joined_part = lattice_graph.labels[
-                            joined_abstract_value
-                        ].copy()
+                        lattice_joined_part = deepcopy(
+                            lattice_graph.labels[joined_abstract_value]
+                        )
 
                         with (
                             self.animate_mobject(

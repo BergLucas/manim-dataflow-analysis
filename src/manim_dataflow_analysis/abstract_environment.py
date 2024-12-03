@@ -22,17 +22,10 @@ class AbstractEnvironment(Generic[L]):
         self, other: AbstractEnvironment[L]
     ) -> Generator[tuple[str, L], None, None]:
         for variable in self.variables | other.variables:
-            self_abstract_value = self.variables.get(variable)
-            other_abstract_value = other.variables.get(variable)
-
-            if self_abstract_value is None:
-                yield variable, other_abstract_value
-            elif other_abstract_value is None:
-                yield variable, self_abstract_value
-            else:
-                yield variable, self.lattice.join(
-                    self_abstract_value, other_abstract_value
-                )
+            yield variable, self.lattice.join(
+                self.variables.get(variable, self.lattice.bottom()),
+                other.variables.get(variable, self.lattice.bottom()),
+            )
 
     def join(self, other: AbstractEnvironment[L]) -> AbstractEnvironment[L]:
         return AbstractEnvironment(
@@ -74,7 +67,7 @@ LINE_LENGTH = 10
 EMPTY_CHARACTER = r"\hspace{0pt}"
 
 
-class AbstractEnvironmentUpdateInstances(MathTex, Generic[L]):
+class AbstractEnvironmentUpdateInstances(MathTex):
     def __init__(
         self, updates_instances: Iterable[tuple[str, str, str | None]]
     ) -> None:
