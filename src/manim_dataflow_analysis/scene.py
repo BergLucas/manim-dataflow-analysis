@@ -65,10 +65,12 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     lattice_position: tuple[float, float, float] = (fw(1), fh(-0.0775), 0)
     lattice_camera_position: tuple[float, float, float] = (fw(1), 0, 0)
     lattice_wait_time: float = 5.0
+    lattice_join_title_template: str = (
+        "We join {abstract_value1} and {abstract_value2} which results in {joined_abstract_value}"
+    )
+    lattice_join_wait_time: float = 5.0
     lattice_max_horizontal_size_per_vertex: int = 8
     lattice_max_vertical_size: int = 8
-    lattice_transform_wait_time: float = 2.5
-    lattice_join_wait_time: float = 5.0
     sorting_function: Callable[[Iterable[Hashable]], list[Hashable]] = (
         default_sorting_function
     )
@@ -201,19 +203,28 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         "We update the rest of the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the res abstract environment :"
     )
     worklist_is_included_title_template: str = (
-        "res[COND(p,p')] is included in the abstract environment {program_point}\nso we reached a fixed point :"
+        "res[COND(p,p')] is included in the abstract environment {successor_point}\nso we reached a fixed point :"
     )
     worklist_not_included_title_template: str = (
-        "res[COND(p,p')] is not included in the abstract environment {program_point}\nso we must process the successor {successor_program_point} :"
+        "res[COND(p,p')] is not included in the abstract environment {successor_point}\nso we must process the successor {successor_program_point} :"
+    )
+    worklist_joined_values_title_template: str = (
+        "We join the values from the abstract environment res[COND(p,p')] with\nthe abstract environment {program_point} :"
+    )
+    worklist_add_successor_title_template: str = (
+        "We add the successor {program_point} to the worklist :"
     )
     worklist_camera_position: tuple[float, float, float] = (0, 0, 0)
-    worklist_pop_wait_time: float = 2.5
-    worklist_control_flow_variables_wait_time: float = 2.5
-    worklist_table_variables_wait_time: float = 2.5
-    worklist_successor_wait_time: float = 2.5
-    worklist_condition_update_variables_wait_time: float = 2.5
-    worklist_res_variables_wait_time: float = 2.5
-    worklist_included_wait_time: float = 2.5
+    worklist_pop_wait_time: float = 5.0
+    worklist_control_flow_variables_wait_time: float = 5.0
+    worklist_table_variables_wait_time: float = 5.0
+    worklist_successor_wait_time: float = 5.0
+    worklist_condition_update_variables_wait_time: float = 5.0
+    worklist_res_variables_wait_time: float = 5.0
+    worklist_included_wait_time: float = 5.0
+    worklist_joined_values_wait_time: float = 5.0
+    worklist_add_successor_wait_time: float = 5.0
+    worklist_wait_time: float = 5.0
 
     def show_title(self) -> None:
         title = Text(self.title)
@@ -431,43 +442,6 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         self.play(Uncreate(arrow), Uncreate(program), Unwrite(program_conversion_title))
 
         return entry_point, program_cfg, cfg
-
-    def show_lattice_join(
-        self,
-        lattice_graph: LatticeGraph[L],
-        value1: L,
-        value2: L,
-        position: tuple[float, float, float] = (0, 0, 0),
-        scale: float = 0.25,
-        max_horizontal_size_per_vertex: int = 8,
-        max_vertical_size: int = 8,
-    ) -> LatticeGraph[L]:
-        joined_value = self.lattice.join(value1, value2)
-
-        visible_vertices = {
-            value1,
-            value2,
-            joined_value,
-        }
-
-        new_lattice_graph = self.create_lattice_graph(
-            position=position,
-            scale=scale,
-            visible_vertices=visible_vertices,
-            max_horizontal_size_per_vertex=max_horizontal_size_per_vertex,
-            max_vertical_size=max_vertical_size,
-        )
-
-        self.play(FadeTransform(lattice_graph, new_lattice_graph))
-
-        self.wait(self.lattice_transform_wait_time)
-
-        new_lattice_graph.color_path(value1, joined_value)
-        new_lattice_graph.color_path(value2, joined_value)
-
-        self.wait(self.lattice_join_wait_time)
-
-        return new_lattice_graph
 
     def show_flow_function_instance(
         self,
@@ -1201,14 +1175,13 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                 if included:
                     worklist_included_title = Text(
                         self.worklist_is_included_title_template.format(
-                            program_point=str(program_point.point)
+                            successor_program_point=str(successor.point)
                         )
                     )
                 else:
                     worklist_included_title = Text(
                         self.worklist_not_included_title_template.format(
                             successor_program_point=str(successor.point),
-                            program_point=str(program_point.point),
                         )
                     )
                 self.scale_mobject(
@@ -1225,11 +1198,142 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                 self.play(Uncreate(worklist_included_title))
 
                 if not included:
-                    abstract_environments[successor] = abstract_environments[
+                    worklist_joined_values_title = Text(
+                        self.worklist_joined_values_title_template.format(
+                            program_point=str(successor.point)
+                        )
+                    )
+                    self.scale_mobject(
+                        worklist_joined_values_title,
+                        self.cfg_title_width,
+                        self.cfg_title_height,
+                    )
+                    worklist_joined_values_title.move_to(self.cfg_title_position)
+
+                    self.play(Create(worklist_joined_values_title))
+
+                    self.wait(self.worklist_joined_values_wait_time)
+
+                    for variable, joined_abstract_value in abstract_environments[
                         successor
-                    ].join(res_cond)
+                    ].join_generator(res_cond):
+                        abstract_environments[successor] = abstract_environments[
+                            successor
+                        ].set(**{variable: joined_abstract_value})
+
+                        current_abstract_value = abstract_environments[program_point][
+                            variable
+                        ]
+                        successor_abstract_value = abstract_environments[successor][
+                            variable
+                        ]
+
+                        new_lattice_graph = self.create_lattice_graph(
+                            {
+                                current_abstract_value,
+                                successor_abstract_value,
+                                joined_abstract_value,
+                            }
+                        )
+
+                        self.add(lattice_graph)
+                        self.play(FadeTransform(lattice_graph, new_lattice_graph))
+
+                        self.add(new_lattice_graph)
+                        self.remove(lattice_graph)
+
+                        program_point_part = table.get_variable_part(
+                            program_point, variable
+                        ).copy()
+                        res_cond_part = res_table.get_res_cond_variable_part(
+                            variable
+                        ).copy()
+
+                        lattice_program_point_part = lattice_graph.labels[
+                            current_abstract_value
+                        ]
+                        lattice_res_cond_part = lattice_graph.labels[
+                            successor_abstract_value
+                        ]
+
+                        lattice_join_title = Text(
+                            self.lattice_join_title_template.format(
+                                abstract_value1=current_abstract_value,
+                                abstract_value2=successor_abstract_value,
+                                joined_abstract_value=joined_abstract_value,
+                            )
+                        )
+                        self.scale_mobject(
+                            lattice_join_title,
+                            self.lattice_title_width,
+                            self.lattice_title_height,
+                        )
+                        lattice_join_title.move_to(self.lattice_title_position)
+
+                        self.play(
+                            Create(lattice_join_title),
+                            Transform(program_point_part, lattice_program_point_part),
+                            Transform(res_cond_part, lattice_res_cond_part),
+                            self.camera.frame.animate.move_to(
+                                self.lattice_camera_position
+                            ),
+                        )
+
+                        self.remove(lattice_program_point_part, lattice_res_cond_part)
+
+                        new_lattice_graph.color_path(
+                            current_abstract_value, joined_abstract_value
+                        )
+                        new_lattice_graph.color_path(
+                            successor_abstract_value, joined_abstract_value
+                        )
+
+                        self.wait(self.lattice_join_wait_time)
+
+                        lattice_joined_part = lattice_graph.labels[
+                            joined_abstract_value
+                        ].copy()
+
+                        with (
+                            self.animate_mobject(
+                                table,
+                                self.create_worklist_table(
+                                    variables, abstract_environments
+                                ),
+                            ) as (
+                                table_animation,
+                                table,
+                            ),
+                        ):
+                            self.play(
+                                Uncreate(lattice_join_title),
+                                Transform(
+                                    lattice_joined_part,
+                                    table.get_variable_part(successor, variable),
+                                ),
+                                self.camera.frame.animate.move_to(
+                                    self.worklist_camera_position
+                                ),
+                                table_animation,
+                            )
+
+                        self.remove(lattice_joined_part, new_lattice_graph)
+
+                    self.play(Uncreate(worklist_joined_values_title))
 
                     worklist.add(successor)
+
+                    worklist_add_successor_title = Text(
+                        self.worklist_add_successor_title_template.format(
+                            program_point=str(successor.point)
+                        )
+                    )
+                    self.scale_mobject(
+                        worklist_add_successor_title,
+                        self.cfg_title_width,
+                        self.cfg_title_height,
+                    )
+                    worklist_add_successor_title.move_to(self.cfg_title_position)
 
                     with (
                         self.animate_mobject(
@@ -1239,17 +1343,15 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                             worklist_animation,
                             worklist_tex,
                         ),
-                        self.animate_mobject(
-                            table,
-                            self.create_worklist_table(
-                                variables, abstract_environments
-                            ),
-                        ) as (
-                            table_animation,
-                            table,
-                        ),
                     ):
-                        self.play(worklist_animation, table_animation)
+                        self.play(
+                            Create(worklist_add_successor_title),
+                            worklist_animation,
+                        )
+
+                    self.wait(self.worklist_add_successor_wait_time)
+
+                    self.play(Uncreate(worklist_add_successor_title))
 
                 with (
                     self.animate_mobject(
@@ -1314,6 +1416,8 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     table_program_point_animation,
                 )
 
+        self.wait(self.worklist_wait_time)
+
     def construct(self):
         self.play(self.camera.frame.animate.move_to(self.title_camera_position))
 
@@ -1328,6 +1432,9 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                 self.control_flow_function_camera_position
             )
         )
+
+        # Temporary remove tex to improve performance
+        self.remove(lattice_graph)
 
         control_flow_function_tex = self.show_control_flow_function()
 
@@ -1372,5 +1479,3 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
             flow_function_tex,
             condition_update_function_tex,
         )
-
-        self.wait(5)
