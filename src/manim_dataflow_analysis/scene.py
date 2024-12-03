@@ -1229,14 +1229,14 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     for variable, joined_abstract_value in abstract_environments[
                         successor
                     ].join_generator(res_cond):
-                        abstract_environments[successor] = abstract_environments[
-                            successor
-                        ].set(**{variable: joined_abstract_value})
-
                         current_abstract_value = res_cond[variable]
                         successor_abstract_value = abstract_environments[successor][
                             variable
                         ]
+
+                        abstract_environments[successor] = abstract_environments[
+                            successor
+                        ].set(**{variable: joined_abstract_value})
 
                         new_lattice_graph = self.create_lattice_graph(
                             {
