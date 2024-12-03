@@ -1233,9 +1233,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                             successor
                         ].set(**{variable: joined_abstract_value})
 
-                        current_abstract_value = abstract_environments[program_point][
-                            variable
-                        ]
+                        current_abstract_value = res_cond[variable]
                         successor_abstract_value = abstract_environments[successor][
                             variable
                         ]
