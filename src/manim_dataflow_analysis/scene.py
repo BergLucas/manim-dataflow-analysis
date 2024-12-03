@@ -200,6 +200,12 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     worklist_res_variables_title_template: str = (
         "We update the rest of the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the res abstract environment :"
     )
+    worklist_is_included_title_template: str = (
+        "res[COND(p,p')] is included in the abstract environment {program_point}\nso we reached a fixed point :"
+    )
+    worklist_not_included_title_template: str = (
+        "res[COND(p,p')] is not included in the abstract environment {program_point}\nso we must process the successor {successor_program_point} :"
+    )
     worklist_camera_position: tuple[float, float, float] = (0, 0, 0)
     worklist_pop_wait_time: float = 2.5
     worklist_control_flow_variables_wait_time: float = 2.5
@@ -207,6 +213,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     worklist_successor_wait_time: float = 2.5
     worklist_condition_update_variables_wait_time: float = 2.5
     worklist_res_variables_wait_time: float = 2.5
+    worklist_included_wait_time: float = 2.5
 
     def show_title(self) -> None:
         title = Text(self.title)
@@ -1189,7 +1196,35 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
                 self.play(Uncreate(worklist_res_variables_title))
 
-                if not abstract_environments[successor].includes(res_cond):
+                included = abstract_environments[successor].includes(res_cond)
+
+                if included:
+                    worklist_included_title = Text(
+                        self.worklist_is_included_title_template.format(
+                            program_point=str(program_point.point)
+                        )
+                    )
+                else:
+                    worklist_included_title = Text(
+                        self.worklist_not_included_title_template.format(
+                            successor_program_point=str(successor.point),
+                            program_point=str(program_point.point),
+                        )
+                    )
+                self.scale_mobject(
+                    worklist_included_title,
+                    self.cfg_title_width,
+                    self.cfg_title_height,
+                )
+                worklist_included_title.move_to(self.cfg_title_position)
+
+                self.play(Create(worklist_included_title))
+
+                self.wait(self.worklist_included_wait_time)
+
+                self.play(Uncreate(worklist_included_title))
+
+                if not included:
                     abstract_environments[successor] = abstract_environments[
                         successor
                     ].join(res_cond)
