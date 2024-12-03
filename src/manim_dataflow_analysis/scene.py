@@ -514,7 +514,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     def show_control_flow_function_instance(
         self,
         control_flow_function_tex: AbstractEnvironmentUpdateInstances,
-        flow_function_tex: AbstractEnvironmentUpdateInstances,
+        flow_function_tex: AbstractEnvironmentUpdateInstances | None,
         instance_id: int | tuple[int, int],
         program_point: ProgramPoint,
     ):
@@ -587,6 +587,8 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                 )
             else:
                 self.remove(instance_rectangle, modification_rectangle)
+
+            assert flow_function_tex is not None
 
             self.show_flow_function_instance(
                 flow_function_tex,
@@ -764,7 +766,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         cfg: ControlFlowGraph,
         lattice_graph: LatticeGraph[L],
         control_flow_function_tex: AbstractEnvironmentUpdateInstances,
-        flow_function_tex: AbstractEnvironmentUpdateInstances,
+        flow_function_tex: AbstractEnvironmentUpdateInstances | None,
         condition_update_function_tex: AbstractEnvironmentUpdateInstances,
     ):
         abstract_environments = {
@@ -877,6 +879,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                 control_flow_function_instance = (
                     control_flow_function_tex.get_instance_part(instance_id)
                 )
+                assert flow_function_tex is not None
                 control_flow_function_result = flow_function_tex.get_modification_part(
                     flow_instance_id
                 )
@@ -1466,9 +1469,11 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         self.play(self.camera.frame.animate.move_to(self.program_camera_position))
 
         # Temporary remove tex to improve performance
+        if flow_function_tex is not None:
+            self.remove(flow_function_tex)
+
         self.remove(
             control_flow_function_tex,
-            flow_function_tex,
             condition_update_function_tex,
         )
 
