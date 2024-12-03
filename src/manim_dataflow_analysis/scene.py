@@ -185,8 +185,16 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     worklist_condition_update_function_title_template: str = (
         "We use the condition update function on our condition {condition} :"
     )
+    worklist_control_flow_variables_title_template: str = (
+        "We update the res abstract environment with the variables\n{variables} coming from the control flow function :"
+    )
+    worklist_table_variables_title_template: str = (
+        "We update the rest of the res abstract environment with the variables\n{variables} coming from the abstract environment {program_point} :"
+    )
     worklist_camera_position: tuple[float, float, float] = (0, 0, 0)
     worklist_pop_wait_time: float = 2.5
+    worklist_control_flow_variables_wait_time: float = 2.5
+    worklist_table_variables_wait_time: float = 2.5
 
     def show_title(self) -> None:
         title = Text(self.title)
@@ -871,6 +879,8 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
             program_point_label = cfg.labels[program_point].copy()
 
+            self.add(control_flow_function_tex, flow_function_tex)
+
             self.play(
                 Uncreate(worklist_pop_title),
                 Transform(program_point_label, control_flow_function_instance),
@@ -886,6 +896,18 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                 res_instance_id,
                 program_point,
             )
+
+            worklist_control_flow_variables_title = Text(
+                self.worklist_control_flow_variables_title_template.format(
+                    variables=", ".join(variable for variable in res_variables)
+                )
+            )
+            self.scale_mobject(
+                worklist_control_flow_variables_title,
+                self.cfg_title_width,
+                self.cfg_title_height,
+            )
+            worklist_control_flow_variables_title.move_to(self.cfg_title_position)
 
             with (
                 self.animate_mobject(
@@ -904,11 +926,35 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     for variable in res_variables
                 )
                 self.play(
+                    Create(worklist_control_flow_variables_title),
                     self.camera.frame.animate.move_to(self.worklist_camera_position),
                     res_table_animation,
                     *(Transform(*res_part) for res_part in res_parts),
                 )
-                self.remove(*(part for part, _ in res_parts))
+                self.remove(
+                    control_flow_function_tex,
+                    flow_function_tex,
+                    *(part for part, _ in res_parts),
+                )
+
+            self.wait(self.worklist_control_flow_variables_wait_time)
+
+            worklist_table_variables_title = Text(
+                self.worklist_table_variables_title_template.format(
+                    program_point=str(program_point.point),
+                    variables=", ".join(
+                        variable
+                        for variable in variables
+                        if variable not in res_variables
+                    ),
+                )
+            )
+            self.scale_mobject(
+                worklist_table_variables_title,
+                self.cfg_title_width,
+                self.cfg_title_height,
+            )
+            worklist_table_variables_title.move_to(self.cfg_title_position)
 
             with (
                 self.animate_mobject(
@@ -925,6 +971,10 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     if variable not in res_variables
                 )
                 self.play(
+                    Transform(
+                        worklist_control_flow_variables_title,
+                        worklist_table_variables_title,
+                    ),
                     res_table_animation,
                     *(
                         Transform(*control_flow_part)
@@ -932,6 +982,13 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     ),
                 )
                 self.remove(*(part for part, _ in control_flow_parts))
+                self.add(worklist_table_variables_title)
+
+            self.remove(worklist_control_flow_variables_title)
+
+            self.wait(self.worklist_table_variables_wait_time)
+
+            self.play(Uncreate(worklist_table_variables_title))
 
             table_successor_program_point_rectangle = None
             successor_program_point_rectangle = None
@@ -983,6 +1040,8 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     )
                 )
 
+                self.add(condition_update_function_tex)
+
                 self.play(
                     Transform(program_point_label, condition_update_function_instance),
                     Transform(
@@ -1031,6 +1090,8 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                         ),
                     )
                     self.remove(*(part for part, _ in res_cond_parts))
+
+                self.remove(condition_update_function_tex)
 
                 with (
                     self.animate_mobject(
@@ -1175,6 +1236,13 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         condition_update_function_tex = self.show_condition_update_function()
 
         self.play(self.camera.frame.animate.move_to(self.program_camera_position))
+
+        # Temporary remove tex to improve performance
+        self.remove(
+            control_flow_function_tex,
+            flow_function_tex,
+            condition_update_function_tex,
+        )
 
         program = self.show_program()
 
