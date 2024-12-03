@@ -39,7 +39,7 @@ lint = ["black", "ruff", "mypy"]
 [tool.coverage.run]
 relative_files = true
 branch = true
-source = ["src/image_analyst", "tests"]
+source = ["src/manim_dataflow_analysis", "tests"]
 
 [tool.ruff.lint]
 select = [
