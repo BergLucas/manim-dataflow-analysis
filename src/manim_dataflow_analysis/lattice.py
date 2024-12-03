@@ -20,15 +20,14 @@ import networkx as nx
 import numpy as np
 from manim.mobject.geometry.arc import LabeledDot, TipableVMobject
 from manim.mobject.geometry.line import DashedLine, Line
-from manim.mobject.graph import LayoutFunction, LayoutName
-from manim.mobject.mobject import Mobject
 from manim.mobject.text.text_mobject import Text
 from manim.utils.color import BLACK, GREEN, WHITE, ManimColor
 
 from manim_dataflow_analysis.graph import BetterDiGraph
 
 if TYPE_CHECKING:
-    from manim.mobject.graph import NxGraph
+    from manim.mobject.graph import LayoutFunction, LayoutName, NxGraph
+    from manim.mobject.mobject import Mobject
     from manim.typing import Point3D
 
 
@@ -271,7 +270,7 @@ def lattice_layout(
     else:
         scale_x = scale_y = 1
 
-    vertices_heights: dict[Hashable, int] = dict()
+    vertices_heights: dict[Hashable, int] = {}
 
     for vertex, degree in graph.in_degree():
         if degree != 0:
@@ -408,21 +407,21 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                 half_vertical_size = half_top_vertical_size
                 infinite_vertices = top_infinite_vertices
                 children_iterable = lattice.predecessors(vertex)
-                children_visible_vertices = set(
+                children_visible_vertices = {
                     visible_vertex
                     for visible_vertex in visible_vertices
                     if lattice.is_predecessor(vertex, visible_vertex)
-                )
+                }
             else:
                 incomplete_vertices = bottom_incomplete_vertices
                 half_vertical_size = half_bottom_vertical_size
                 infinite_vertices = bottom_infinite_vertices
                 children_iterable = lattice.successors(vertex)
-                children_visible_vertices = set(
+                children_visible_vertices = {
                     visible_vertex
                     for visible_vertex in visible_vertices
                     if lattice.is_successor(vertex, visible_vertex)
-                )
+                }
 
             children, is_finished = cls._take_max_horizontal_size(
                 children_iterable,
@@ -496,9 +495,9 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                     invert_direction,
                 )
 
-        unprocessed_visible_vertices = set(
+        unprocessed_visible_vertices = {
             vertex for vertex in visible_vertices if vertex not in vertices
-        )
+        }
 
         cls._create_unprocessed_vertices(
             lattice,
@@ -554,9 +553,9 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             True,
         )
 
-        final_visible_vertices = set(
+        final_visible_vertices = {
             vertex for vertex in unprocessed_visible_vertices if vertex not in vertices
-        )
+        }
 
         cls._bridge_infinite_vertices(
             lattice,
@@ -622,12 +621,12 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         if invert_direction:
             incomplete = lattice.has_other_successors_than(
                 vertex,
-                set(end for start, end in edges if start == vertex),
+                {end for start, end in edges if start == vertex},
             )
         else:
             incomplete = lattice.has_other_predecessors_than(
                 vertex,
-                set(start for start, end in edges if end == vertex),
+                {start for start, end in edges if end == vertex},
             )
 
         if not incomplete:

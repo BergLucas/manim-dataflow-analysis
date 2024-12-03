@@ -3,9 +3,9 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Protocol
 
-import networkx as nx
-
 if TYPE_CHECKING:
+    import networkx as nx
+
     from manim_dataflow_analysis.cfg import ProgramPoint
 
 

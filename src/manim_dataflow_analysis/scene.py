@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Callable, Collection, Generator, Generic, Hashable, Iterable, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Collection,
+    Generator,
+    Generic,
+    Hashable,
+    Iterable,
+    TypeVar,
+)
 
-import networkx as nx
 from frozendict import frozendict
 from manim import config
-from manim.animation.animation import Animation
 from manim.animation.creation import Create, Uncreate, Unwrite, Write
 from manim.animation.transform import FadeTransform, Transform
 from manim.mobject.geometry.line import Arrow
@@ -14,7 +21,6 @@ from manim.mobject.geometry.shape_matchers import SurroundingRectangle
 from manim.mobject.mobject import Mobject
 from manim.mobject.text.code_mobject import Code
 from manim.mobject.text.text_mobject import Text
-from manim.mobject.types.vectorized_mobject import VMobject
 from manim.scene.zoomed_scene import MovingCameraScene
 from manim.utils.color import ORANGE
 
@@ -22,16 +28,24 @@ from manim_dataflow_analysis.abstract_environment import (
     AbstractEnvironment,
     AbstractEnvironmentUpdateInstances,
 )
-from manim_dataflow_analysis.ast import AstFunction, AstStatement
 from manim_dataflow_analysis.cfg import ControlFlowGraph, ProgramPoint, cond, succ
-from manim_dataflow_analysis.condition_update_function import ConditionUpdateFunction
-from manim_dataflow_analysis.flow_function import ControlFlowFunction
 from manim_dataflow_analysis.lattice import (
     Lattice,
     LatticeGraph,
     default_sorting_function,
 )
 from manim_dataflow_analysis.worklist import ResTable, WorklistTable, WorklistTex
+
+if TYPE_CHECKING:
+    import networkx as nx
+    from manim.animation.animation import Animation
+    from manim.mobject.types.vectorized_mobject import VMobject
+
+    from manim_dataflow_analysis.ast import AstFunction, AstStatement
+    from manim_dataflow_analysis.condition_update_function import (
+        ConditionUpdateFunction,
+    )
+    from manim_dataflow_analysis.flow_function import ControlFlowFunction
 
 
 def fw(scale_w: float):
@@ -229,7 +243,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
             visible_vertices=visible_vertices,
             max_horizontal_size_per_vertex=self.lattice_max_horizontal_size_per_vertex,
             max_vertical_size=self.lattice_max_vertical_size,
-            layout_config=dict(sorting_function=type(self).sorting_function),
+            layout_config={"sorting_function": type(self).sorting_function},
         )
 
         self.scale_mobject(lattice_graph, self.lattice_width, self.lattice_height)

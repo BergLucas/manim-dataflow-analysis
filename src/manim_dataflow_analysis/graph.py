@@ -2,17 +2,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Hashable
 
-import networkx as nx
 from manim.mobject.geometry.arc import Dot, TipableVMobject
 from manim.mobject.geometry.line import Line
 from manim.mobject.geometry.polygram import Rectangle
 from manim.mobject.graph import DiGraph, LayoutFunction, LayoutName
-from manim.mobject.mobject import Mobject
 from manim.mobject.text.tex_mobject import MathTex, SingleStringMathTex, Tex
-from manim.mobject.text.text_mobject import Text
 from manim.utils.color import BLACK, WHITE
 
 if TYPE_CHECKING:
+    import networkx as nx
+    from manim.mobject.mobject import Mobject
+    from manim.mobject.text.text_mobject import Text
     from manim.typing import Point3D
 
 

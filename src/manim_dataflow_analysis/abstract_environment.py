@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Generator, Generic, Iterable, TypeVar
+from typing import TYPE_CHECKING, Generator, Generic, Iterable, TypeVar
 
 from frozendict import frozendict
 from manim.mobject.text.tex_mobject import MathTex, SingleStringMathTex
 from manim.mobject.types.vectorized_mobject import VGroup, VMobject
 
-from manim_dataflow_analysis.lattice import Lattice
+if TYPE_CHECKING:
+    from manim_dataflow_analysis.lattice import Lattice
 
 L = TypeVar("L")
 

@@ -7,17 +7,16 @@ from typing import TYPE_CHECKING, Any, Hashable, Iterable, Protocol, TypeVar, ca
 import networkx as nx
 import numpy as np
 from manim.mobject.geometry.arc import TipableVMobject
-from manim.mobject.graph import LayoutFunction, LayoutName
-from manim.mobject.mobject import Mobject
 from manim.mobject.text.tex_mobject import SingleStringMathTex, Tex
-from manim.mobject.text.text_mobject import Text
 from manim.utils.color import BLACK, GREEN, RED
 
 from manim_dataflow_analysis.graph import BetterDiGraph, LabeledRectangle
 
 if TYPE_CHECKING:
     from manim.mobject.geometry.tips import ArrowTip
-    from manim.mobject.graph import NxGraph
+    from manim.mobject.graph import LayoutFunction, LayoutName, NxGraph
+    from manim.mobject.mobject import Mobject
+    from manim.mobject.text.text_mobject import Text
     from manim.typing import Point3D
     from typing_extensions import Self
 
@@ -187,7 +186,7 @@ def __cfg_node_depth(
     current_width = 0
     current_height = 0
 
-    done_override: dict[Hashable, int] = dict()
+    done_override: dict[Hashable, int] = {}
     coords: dict[Hashable, tuple[int, int]] = {}
 
     for successor in successors:
