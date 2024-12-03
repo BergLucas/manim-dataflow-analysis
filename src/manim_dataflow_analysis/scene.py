@@ -191,10 +191,22 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     worklist_table_variables_title_template: str = (
         "We update the rest of the res abstract environment with the variables\n{variables} coming from the abstract environment {program_point} :"
     )
+    worklist_successor_title_template: str = (
+        "We try to check if we need to process the successor {successor_program_point} :"
+    )
+    worklist_condition_update_variables_title_template: str = (
+        "We update the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the condition update function :"
+    )
+    worklist_res_variables_title_template: str = (
+        "We update the rest of the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the res abstract environment :"
+    )
     worklist_camera_position: tuple[float, float, float] = (0, 0, 0)
     worklist_pop_wait_time: float = 2.5
     worklist_control_flow_variables_wait_time: float = 2.5
     worklist_table_variables_wait_time: float = 2.5
+    worklist_successor_wait_time: float = 2.5
+    worklist_condition_update_variables_wait_time: float = 2.5
+    worklist_res_variables_wait_time: float = 2.5
 
     def show_title(self) -> None:
         title = Text(self.title)
@@ -982,8 +994,8 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     ),
                 )
                 self.remove(*(part for part, _ in control_flow_parts))
-                self.add(worklist_table_variables_title)
 
+            self.add(worklist_table_variables_title)
             self.remove(worklist_control_flow_variables_title)
 
             self.wait(self.worklist_table_variables_wait_time)
@@ -994,6 +1006,18 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
             successor_program_point_rectangle = None
 
             for successor in succ(program_cfg, program_point):
+                worklist_successor_title = Text(
+                    self.worklist_successor_title_template.format(
+                        successor_program_point=str(successor.point),
+                    )
+                )
+                self.scale_mobject(
+                    worklist_successor_title,
+                    self.cfg_title_width,
+                    self.cfg_title_height,
+                )
+                worklist_successor_title.move_to(self.cfg_title_position)
+
                 with (
                     self.animate_mobject(
                         successor_program_point_rectangle,
@@ -1013,9 +1037,14 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     ),
                 ):
                     self.play(
+                        Create(worklist_successor_title),
                         successor_program_point_animation,
                         table_successor_program_point_animation,
                     )
+
+                self.wait(self.worklist_successor_wait_time)
+
+                self.play(Uncreate(worklist_successor_title))
 
                 condition: E = cond(program_cfg, program_point, successor)
 
@@ -1060,6 +1089,20 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     condition,
                 )
 
+                worklist_condition_update_variables_title = Text(
+                    self.worklist_condition_update_variables_title_template.format(
+                        variables=", ".join(variable for variable in res_cond_variables)
+                    )
+                )
+                self.scale_mobject(
+                    worklist_condition_update_variables_title,
+                    self.cfg_title_width,
+                    self.cfg_title_height,
+                )
+                worklist_condition_update_variables_title.move_to(
+                    self.cfg_title_position
+                )
+
                 with (
                     self.animate_mobject(
                         res_table,
@@ -1080,6 +1123,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                         for variable in res_cond_variables
                     )
                     self.play(
+                        Create(worklist_condition_update_variables_title),
                         self.camera.frame.animate.move_to(
                             self.worklist_camera_position
                         ),
@@ -1092,6 +1136,24 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     self.remove(*(part for part, _ in res_cond_parts))
 
                 self.remove(condition_update_function_tex)
+
+                self.wait(self.worklist_condition_update_variables_wait_time)
+
+                worklist_res_variables_title = Text(
+                    self.worklist_res_variables_title_template.format(
+                        variables=", ".join(
+                            variable
+                            for variable in variables
+                            if variable not in res_cond_variables
+                        ),
+                    )
+                )
+                self.scale_mobject(
+                    worklist_res_variables_title,
+                    self.cfg_title_width,
+                    self.cfg_title_height,
+                )
+                worklist_res_variables_title.move_to(self.cfg_title_position)
 
                 with (
                     self.animate_mobject(
@@ -1108,6 +1170,10 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                         if variable not in res_cond_variables
                     )
                     self.play(
+                        Transform(
+                            worklist_condition_update_variables_title,
+                            worklist_res_variables_title,
+                        ),
                         res_cond_table_animation,
                         *(
                             Transform(*condition_update_part)
@@ -1115,6 +1181,13 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                         ),
                     )
                     self.remove(*(part for part, _ in condition_update_parts))
+
+                self.add(worklist_res_variables_title)
+                self.remove(worklist_condition_update_variables_title)
+
+                self.wait(self.worklist_res_variables_wait_time)
+
+                self.play(Uncreate(worklist_res_variables_title))
 
                 if not abstract_environments[successor].includes(res_cond):
                     abstract_environments[successor] = abstract_environments[
