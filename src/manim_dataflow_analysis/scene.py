@@ -1259,6 +1259,13 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                             variable
                         ).copy()
 
+                        new_lattice_graph.color_path(
+                            current_abstract_value, joined_abstract_value
+                        )
+                        new_lattice_graph.color_path(
+                            successor_abstract_value, joined_abstract_value
+                        )
+
                         lattice_res_cond_part = lattice_graph.labels[
                             current_abstract_value
                         ]
@@ -1292,13 +1299,6 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                         )
 
                         self.remove(lattice_successor_part, lattice_res_cond_part)
-
-                        new_lattice_graph.color_path(
-                            current_abstract_value, joined_abstract_value
-                        )
-                        new_lattice_graph.color_path(
-                            successor_abstract_value, joined_abstract_value
-                        )
 
                         self.wait(self.lattice_join_wait_time)
 
