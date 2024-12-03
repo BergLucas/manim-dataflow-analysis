@@ -1259,10 +1259,10 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                             variable
                         ).copy()
 
-                        lattice_program_point_part = lattice_graph.labels[
+                        lattice_res_cond_part = lattice_graph.labels[
                             current_abstract_value
                         ]
-                        lattice_res_cond_part = lattice_graph.labels[
+                        lattice_successor_part = lattice_graph.labels[
                             successor_abstract_value
                         ]
 
@@ -1283,7 +1283,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                         self.play(
                             Create(lattice_join_title),
                             Transform(
-                                successor_program_point_part, lattice_program_point_part
+                                successor_program_point_part, lattice_successor_part
                             ),
                             Transform(res_cond_part, lattice_res_cond_part),
                             self.camera.frame.animate.move_to(
@@ -1291,7 +1291,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                             ),
                         )
 
-                        self.remove(lattice_program_point_part, lattice_res_cond_part)
+                        self.remove(lattice_successor_part, lattice_res_cond_part)
 
                         new_lattice_graph.color_path(
                             current_abstract_value, joined_abstract_value
