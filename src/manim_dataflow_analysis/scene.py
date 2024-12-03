@@ -1,34 +1,37 @@
 from __future__ import annotations
-from typing import TypeVar, Generic, Hashable, Collection, Iterable, Callable, Generator
-from manim.scene.zoomed_scene import MovingCameraScene
+
+from contextlib import contextmanager
+from typing import Callable, Collection, Generator, Generic, Hashable, Iterable, TypeVar
+
+import networkx as nx
+from frozendict import frozendict
+from manim import config
+from manim.animation.animation import Animation
+from manim.animation.creation import Create, Uncreate, Unwrite, Write
+from manim.animation.transform import FadeTransform, Transform
+from manim.mobject.geometry.line import Arrow
+from manim.mobject.geometry.shape_matchers import SurroundingRectangle
 from manim.mobject.mobject import Mobject
-from manim_dataflow_analysis.ast import AstFunction, AstStatement
-from manim_dataflow_analysis.cfg import ControlFlowGraph, ProgramPoint, succ, cond
-from manim_dataflow_analysis.condition_update_function import ConditionUpdateFunction
-from manim_dataflow_analysis.lattice import (
-    LatticeGraph,
-    Lattice,
-    default_sorting_function,
-)
+from manim.mobject.text.code_mobject import Code
+from manim.mobject.text.text_mobject import Text
+from manim.mobject.types.vectorized_mobject import VMobject
+from manim.scene.zoomed_scene import MovingCameraScene
+from manim.utils.color import ORANGE
+
 from manim_dataflow_analysis.abstract_environment import (
     AbstractEnvironment,
     AbstractEnvironmentUpdateInstances,
 )
+from manim_dataflow_analysis.ast import AstFunction, AstStatement
+from manim_dataflow_analysis.cfg import ControlFlowGraph, ProgramPoint, cond, succ
+from manim_dataflow_analysis.condition_update_function import ConditionUpdateFunction
 from manim_dataflow_analysis.flow_function import ControlFlowFunction
-from manim_dataflow_analysis.worklist import WorklistTex, WorklistTable, ResTable
-from manim.mobject.geometry.shape_matchers import SurroundingRectangle
-from manim.mobject.types.vectorized_mobject import VMobject
-from manim.animation.animation import Animation
-from manim.mobject.geometry.line import Arrow
-from manim.mobject.text.code_mobject import Code
-from manim.mobject.text.text_mobject import Text
-from manim.animation.creation import Create, Uncreate, Write, Unwrite
-from manim.animation.transform import FadeTransform, Transform
-from manim.utils.color import ORANGE
-from contextlib import contextmanager
-from frozendict import frozendict
-from manim import config
-import networkx as nx
+from manim_dataflow_analysis.lattice import (
+    Lattice,
+    LatticeGraph,
+    default_sorting_function,
+)
+from manim_dataflow_analysis.worklist import ResTable, WorklistTable, WorklistTex
 
 
 def fw(scale_w: float):
@@ -45,7 +48,6 @@ M = TypeVar("M", bound=Mobject | None)
 
 
 class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
-
     # Title
     title: str = "Dataflow Analysis"
     title_width: float = fw(0.5)
@@ -65,15 +67,13 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     lattice_position: tuple[float, float, float] = (fw(1), fh(-0.0775), 0)
     lattice_camera_position: tuple[float, float, float] = (fw(1), 0, 0)
     lattice_wait_time: float = 5.0
-    lattice_join_title_template: str = (
-        "We join {abstract_value1} and {abstract_value2} which results in {joined_abstract_value}"
-    )
+    lattice_join_title_template: str = "We join {abstract_value1} and {abstract_value2} which results in {joined_abstract_value}"
     lattice_join_wait_time: float = 5.0
     lattice_max_horizontal_size_per_vertex: int = 8
     lattice_max_vertical_size: int = 8
-    sorting_function: Callable[[Iterable[Hashable]], list[Hashable]] = (
-        default_sorting_function
-    )
+    sorting_function: Callable[
+        [Iterable[Hashable]], list[Hashable]
+    ] = default_sorting_function
 
     # Control-flow function
     control_flow_function: ControlFlowFunction[L]
@@ -178,39 +178,21 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     worklist_pop_title_template: str = (
         "We remove the program point {program_point} from the worklist :"
     )
-    worklist_control_flow_function_title_template: str = (
-        "We use the control-flow function on our program point {program_point} which is the statement {statement} :"
-    )
+    worklist_control_flow_function_title_template: str = "We use the control-flow function on our program point {program_point} which is the statement {statement} :"
     worklist_flow_function_title_template: str = (
         "We use the flow function on our statement {statement} :"
     )
     worklist_condition_update_function_title_template: str = (
         "We use the condition update function on our condition {condition} :"
     )
-    worklist_control_flow_variables_title_template: str = (
-        "We update the res abstract environment with the variables\n{variables} coming from the control flow function :"
-    )
-    worklist_table_variables_title_template: str = (
-        "We update the rest of the res abstract environment with the variables\n{variables} coming from the abstract environment {program_point} :"
-    )
-    worklist_successor_title_template: str = (
-        "We try to check if we need to process the successor {successor_program_point} :"
-    )
-    worklist_condition_update_variables_title_template: str = (
-        "We update the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the condition update function :"
-    )
-    worklist_res_variables_title_template: str = (
-        "We update the rest of the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the res abstract environment :"
-    )
-    worklist_is_included_title_template: str = (
-        "res[COND(p,p')] is included in the abstract environment {successor_program_point}\nso we reached a fixed point :"
-    )
-    worklist_not_included_title_template: str = (
-        "res[COND(p,p')] is not included in the abstract environment {successor_program_point}\nso we must process the successor {successor_program_point} :"
-    )
-    worklist_joined_values_title_template: str = (
-        "We join the values from the abstract environment res[COND(p,p')] with\nthe abstract environment {program_point} :"
-    )
+    worklist_control_flow_variables_title_template: str = "We update the res abstract environment with the variables\n{variables} coming from the control flow function :"
+    worklist_table_variables_title_template: str = "We update the rest of the res abstract environment with the variables\n{variables} coming from the abstract environment {program_point} :"
+    worklist_successor_title_template: str = "We try to check if we need to process the successor {successor_program_point} :"
+    worklist_condition_update_variables_title_template: str = "We update the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the condition update function :"
+    worklist_res_variables_title_template: str = "We update the rest of the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the res abstract environment :"
+    worklist_is_included_title_template: str = "res[COND(p,p')] is included in the abstract environment {successor_program_point}\nso we reached a fixed point :"
+    worklist_not_included_title_template: str = "res[COND(p,p')] is not included in the abstract environment {successor_program_point}\nso we must process the successor {successor_program_point} :"
+    worklist_joined_values_title_template: str = "We join the values from the abstract environment res[COND(p,p')] with\nthe abstract environment {program_point} :"
     worklist_add_successor_title_template: str = (
         "We add the successor {program_point} to the worklist :"
     )
@@ -700,11 +682,10 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                 mobject.scale(max_x / mobject.width)
             else:
                 mobject.scale(max_y / mobject.height)
+        elif max_x / max_y >= mobject.width / mobject.height:
+            mobject.scale(max_y / mobject.height)
         else:
-            if max_x / max_y >= mobject.width / mobject.height:
-                mobject.scale(max_y / mobject.height)
-            else:
-                mobject.scale(max_x / mobject.width)
+            mobject.scale(max_x / mobject.width)
 
     def create_worklist_table(
         self,
@@ -860,10 +841,12 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
             self.wait(self.worklist_pop_wait_time)
 
-            res, res_variables, res_instance_id = (
-                self.control_flow_function.apply_and_get_variables(
-                    program_point, abstract_environments[program_point]
-                )
+            (
+                res,
+                res_variables,
+                res_instance_id,
+            ) = self.control_flow_function.apply_and_get_variables(
+                program_point, abstract_environments[program_point]
             )
 
             if isinstance(res_instance_id, int):
@@ -1041,11 +1024,13 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
                 condition: E = cond(program_cfg, program_point, successor)
 
-                res_cond, res_cond_variables, res_cond_instance_id = (
-                    self.condition_update_function.apply_and_get_variables(
-                        condition,
-                        res,
-                    )
+                (
+                    res_cond,
+                    res_cond_variables,
+                    res_cond_instance_id,
+                ) = self.condition_update_function.apply_and_get_variables(
+                    condition,
+                    res,
                 )
 
                 program_point_label = cfg.labels[program_point].copy()

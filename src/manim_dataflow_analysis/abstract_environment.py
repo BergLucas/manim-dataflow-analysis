@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-from typing import TypeVar, Generic, Iterable, Generator
-from manim.mobject.types.vectorized_mobject import VGroup, VMobject
-from manim.mobject.text.tex_mobject import MathTex, SingleStringMathTex
-from manim_dataflow_analysis.lattice import Lattice
 from dataclasses import dataclass
-from frozendict import frozendict
+from typing import Generator, Generic, Iterable, TypeVar
 
+from frozendict import frozendict
+from manim.mobject.text.tex_mobject import MathTex, SingleStringMathTex
+from manim.mobject.types.vectorized_mobject import VGroup, VMobject
+
+from manim_dataflow_analysis.lattice import Lattice
 
 L = TypeVar("L")
 
 
 @dataclass(frozen=True)
 class AbstractEnvironment(Generic[L]):
-
     lattice: Lattice[L]
     variables: frozendict[str, L] = frozendict()
 
@@ -74,7 +74,6 @@ EMPTY_CHARACTER = r"\hspace{0pt}"
 
 
 class AbstractEnvironmentUpdateInstances(MathTex, Generic[L]):
-
     def __init__(
         self, updates_instances: Iterable[tuple[str, str, str | None]]
     ) -> None:
@@ -91,7 +90,9 @@ class AbstractEnvironmentUpdateInstances(MathTex, Generic[L]):
                     (
                         EMPTY_CHARACTER
                         if condition_tex is None
-                        else r"if" if condition_tex else r"otherwise"
+                        else r"if"
+                        if condition_tex
+                        else r"otherwise"
                     ),
                     r"&",
                     (

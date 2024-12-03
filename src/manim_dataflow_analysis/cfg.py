@@ -1,29 +1,30 @@
 from __future__ import annotations
 
-from manim.mobject.geometry.arc import TipableVMobject
-from manim.mobject.text.tex_mobject import Tex, SingleStringMathTex
-from manim.mobject.text.text_mobject import Text
-from manim.mobject.mobject import Mobject
-from manim.mobject.graph import LayoutName, LayoutFunction
-from manim.utils.color import GREEN, RED, BLACK
-from manim_dataflow_analysis.graph import BetterDiGraph, LabeledRectangle
-from typing import TYPE_CHECKING, Hashable, Protocol, Any, cast, Iterable, TypeVar
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Hashable, Iterable, Protocol, TypeVar, cast
+
 import networkx as nx
 import numpy as np
+from manim.mobject.geometry.arc import TipableVMobject
+from manim.mobject.graph import LayoutFunction, LayoutName
+from manim.mobject.mobject import Mobject
+from manim.mobject.text.tex_mobject import SingleStringMathTex, Tex
+from manim.mobject.text.text_mobject import Text
+from manim.utils.color import BLACK, GREEN, RED
 
+from manim_dataflow_analysis.graph import BetterDiGraph, LabeledRectangle
 
 if TYPE_CHECKING:
     from manim.mobject.geometry.tips import ArrowTip
-    from typing_extensions import Self
-    from manim_dataflow_analysis.ast import AstStatement
     from manim.mobject.graph import NxGraph
     from manim.typing import Point3D
+    from typing_extensions import Self
+
+    from manim_dataflow_analysis.ast import AstStatement
 
 
 class PathArrow(TipableVMobject):
-
     def __init__(
         self,
         *path: Point3D,
@@ -58,29 +59,36 @@ class PathArrow(TipableVMobject):
 
 
 class GraphNode(Protocol):
-    def get_center(self) -> Point3D: ...
+    def get_center(self) -> Point3D:
+        ...
 
-    def get_top(self) -> Point3D: ...
+    def get_top(self) -> Point3D:
+        ...
 
-    def get_bottom(self) -> Point3D: ...
+    def get_bottom(self) -> Point3D:
+        ...
 
-    def get_right(self) -> Point3D: ...
+    def get_right(self) -> Point3D:
+        ...
 
-    def get_left(self) -> Point3D: ...
+    def get_left(self) -> Point3D:
+        ...
 
-    def get_zenith(self) -> Point3D: ...
+    def get_zenith(self) -> Point3D:
+        ...
 
-    def get_nadir(self) -> Point3D: ...
+    def get_nadir(self) -> Point3D:
+        ...
 
 
 class EdgeLayoutFunction(Protocol):
-
     def __call__(
         self,
         vertices: dict[Hashable, GraphNode],
         start: Hashable,
         end: Hashable,
-    ) -> list[Point3D]: ...
+    ) -> list[Point3D]:
+        ...
 
 
 def default_edge_layout(
@@ -92,17 +100,14 @@ def default_edge_layout(
 
 
 class LayoutAndEdgeLayoutFunction(Protocol):
-
     def __call__(
         self,
         graph: NxGraph,
         scale: float | tuple[float, float, float] = 2,
         *args: Any,
         **kwargs: Any,
-    ) -> tuple[
-        dict[Hashable, Point3D],
-        EdgeLayoutFunction,
-    ]: ...
+    ) -> tuple[dict[Hashable, Point3D], EdgeLayoutFunction,]:
+        ...
 
 
 def __cfg_successors(
@@ -252,10 +257,7 @@ def cfg_layout(
     scale: float | tuple[float, float, float] = 2,
     condition_vertices: dict[Hashable, tuple[Hashable]] | None = None,
     vertex_spacing: tuple[float, float] = (1, 1),
-) -> tuple[
-    dict[Hashable, Point3D],
-    EdgeLayoutFunction,
-]:
+) -> tuple[dict[Hashable, Point3D], EdgeLayoutFunction,]:
     if condition_vertices is None:
         raise ValueError("The CFG layout requires the condition vertices to be passed")
 
@@ -367,7 +369,6 @@ class ProgramPoint:
 
 
 class ControlFlowGraph(BetterDiGraph):
-
     @classmethod
     def from_cfg(
         cls, entry_point: ProgramPoint, cfg: nx.DiGraph[ProgramPoint]

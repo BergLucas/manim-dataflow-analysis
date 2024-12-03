@@ -1,15 +1,15 @@
+from typing import Collection, Generic, Mapping, Set, TypeVar
+
 from manim.mobject.table import MobjectTable
-from typing import Collection, Mapping, Generic, TypeVar, Set
-from manim_dataflow_analysis.cfg import ProgramPoint
-from manim_dataflow_analysis.abstract_environment import AbstractEnvironment
 from manim.mobject.text.tex_mobject import MathTex
 
+from manim_dataflow_analysis.abstract_environment import AbstractEnvironment
+from manim_dataflow_analysis.cfg import ProgramPoint
 
 L = TypeVar("L")
 
 
 class WorklistTex(MathTex):
-
     def __init__(self, worklist: Set[ProgramPoint]):
         self.worklist = tuple(worklist)
 
@@ -28,7 +28,6 @@ class WorklistTex(MathTex):
 
 
 class WorklistTable(MobjectTable, Generic[L]):
-
     def __init__(
         self,
         variables: Collection[str],

@@ -1,30 +1,31 @@
 from __future__ import annotations
 
-from typing import (
-    TYPE_CHECKING,
-    Hashable,
-    Protocol,
-    TypeVar,
-    Generic,
-    Iterable,
-    Callable,
-    Any,
-)
-from manim_dataflow_analysis.graph import BetterDiGraph
-from manim.mobject.geometry.arc import TipableVMobject, LabeledDot
-from manim.mobject.graph import LayoutName, LayoutFunction
-from manim.mobject.text.text_mobject import Text
-from manim.mobject.geometry.line import Line, DashedLine
-from manim.mobject.mobject import Mobject
-from manim.utils.color import BLACK, WHITE, GREEN, ManimColor
-from functools import total_ordering
+import math
+from abc import abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
-from abc import abstractmethod
+from functools import total_ordering
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Generic,
+    Hashable,
+    Iterable,
+    Protocol,
+    TypeVar,
+)
+
 import networkx as nx
 import numpy as np
-import math
+from manim.mobject.geometry.arc import LabeledDot, TipableVMobject
+from manim.mobject.geometry.line import DashedLine, Line
+from manim.mobject.graph import LayoutFunction, LayoutName
+from manim.mobject.mobject import Mobject
+from manim.mobject.text.text_mobject import Text
+from manim.utils.color import BLACK, GREEN, WHITE, ManimColor
 
+from manim_dataflow_analysis.graph import BetterDiGraph
 
 if TYPE_CHECKING:
     from manim.mobject.graph import NxGraph
@@ -36,13 +37,16 @@ L = TypeVar("L")
 
 class Lattice(Protocol[L]):
     @abstractmethod
-    def top(self) -> L: ...
+    def top(self) -> L:
+        ...
 
     @abstractmethod
-    def bottom(self) -> L: ...
+    def bottom(self) -> L:
+        ...
 
     @abstractmethod
-    def successors(self, value: L) -> Iterable[L]: ...
+    def successors(self, value: L) -> Iterable[L]:
+        ...
 
     def is_successor(self, value: L, successor: L) -> bool:
         return any(
@@ -67,7 +71,8 @@ class Lattice(Protocol[L]):
         )
 
     @abstractmethod
-    def predecessors(self, value: L) -> Iterable[L]: ...
+    def predecessors(self, value: L) -> Iterable[L]:
+        ...
 
     def is_predecessor(self, value: L, predecessor: L) -> bool:
         return any(
@@ -163,7 +168,6 @@ class Lattice(Protocol[L]):
 
 
 class FiniteSizeLattice(Lattice[L]):
-
     def __init__(self, *edges: tuple[L, L]):
         self.__graph: nx.DiGraph[L] = nx.DiGraph(edges)
 
@@ -355,7 +359,6 @@ class BridgeNode(Generic[L]):
 
 
 class LatticeGraph(Generic[L], BetterDiGraph):
-
     @classmethod
     def from_lattice(
         cls,
@@ -377,12 +380,12 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         vertices: set[L | InfiniteNode[L] | IncompleteNode[L]] = set()
         bottom_infinite_vertices: dict[InfiniteNode[L], set[L]] = {}
         top_infinite_vertices: dict[InfiniteNode[L], set[L]] = {}
-        bottom_incomplete_vertices: dict[IncompleteNode, set[tuple[L, bool]]] = (
-            defaultdict(set)
-        )
-        top_incomplete_vertices: dict[IncompleteNode, set[tuple[L, bool]]] = (
-            defaultdict(set)
-        )
+        bottom_incomplete_vertices: dict[
+            IncompleteNode, set[tuple[L, bool]]
+        ] = defaultdict(set)
+        top_incomplete_vertices: dict[
+            IncompleteNode, set[tuple[L, bool]]
+        ] = defaultdict(set)
         edges: set[
             tuple[
                 L | InfiniteNode[L] | IncompleteNode[L],
@@ -818,18 +821,17 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                                     (infinite_vertex, connection),
                                 )
                             )
+                    elif lattice.is_successor(connection, visible_vertex):
+                        edges.add((connection, visible_vertex))
                     else:
-                        if lattice.is_successor(connection, visible_vertex):
-                            edges.add((connection, visible_vertex))
-                        else:
-                            infinite_vertex = InfiniteNode(connection)
-                            vertices.add(infinite_vertex)
-                            edges.update(
-                                (
-                                    (connection, infinite_vertex),
-                                    (infinite_vertex, visible_vertex),
-                                )
+                        infinite_vertex = InfiniteNode(connection)
+                        vertices.add(infinite_vertex)
+                        edges.update(
+                            (
+                                (connection, infinite_vertex),
+                                (infinite_vertex, visible_vertex),
                             )
+                        )
 
     @classmethod
     def _create_infinite_edges(
@@ -934,9 +936,9 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         ],
         final_visible_vertices: set[L],
     ) -> None:
-        vertices_connections: dict[L | InfiniteNode[L], set[L | InfiniteNode[L]]] = (
-            defaultdict(set)
-        )
+        vertices_connections: dict[
+            L | InfiniteNode[L], set[L | InfiniteNode[L]]
+        ] = defaultdict(set)
 
         bridge_vertices: set[tuple[InfiniteNode[L], InfiniteNode[L]]] = set()
         for bottom_infinite_vertex in bottom_infinite_vertices:

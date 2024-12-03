@@ -1,23 +1,22 @@
 from __future__ import annotations
 
-from manim.mobject.geometry.polygram import Rectangle
-from manim.mobject.geometry.arc import TipableVMobject, Dot
+from typing import TYPE_CHECKING, Hashable
+
+import networkx as nx
+from manim.mobject.geometry.arc import Dot, TipableVMobject
 from manim.mobject.geometry.line import Line
+from manim.mobject.geometry.polygram import Rectangle
+from manim.mobject.graph import DiGraph, LayoutFunction, LayoutName
 from manim.mobject.mobject import Mobject
 from manim.mobject.text.tex_mobject import MathTex, SingleStringMathTex, Tex
-from manim.mobject.graph import DiGraph, LayoutName, LayoutFunction
 from manim.mobject.text.text_mobject import Text
 from manim.utils.color import BLACK, WHITE
-from typing import TYPE_CHECKING, Hashable
-import networkx as nx
-
 
 if TYPE_CHECKING:
     from manim.typing import Point3D
 
 
 class LabeledRectangle(Rectangle):
-
     def __init__(
         self,
         label: str | SingleStringMathTex | Text | Tex,
@@ -43,7 +42,6 @@ class LabeledRectangle(Rectangle):
 
 
 class BetterDiGraph(DiGraph):
-
     def __init__(
         self,
         vertices: list[Hashable],

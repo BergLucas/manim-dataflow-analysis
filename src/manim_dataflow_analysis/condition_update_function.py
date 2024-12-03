@@ -1,6 +1,7 @@
-from manim_dataflow_analysis.abstract_environment import AbstractEnvironment
-from typing import TypeVar, Protocol, Sequence, Mapping
 from abc import abstractmethod
+from typing import Mapping, Protocol, Sequence, TypeVar
+
+from manim_dataflow_analysis.abstract_environment import AbstractEnvironment
 
 L = TypeVar("L")
 E = TypeVar("E")
@@ -9,14 +10,16 @@ E = TypeVar("E")
 class ConditionUpdateFunction(Protocol[L, E]):
     @property
     @abstractmethod
-    def instances(self) -> Sequence[tuple[str, str, str | None]]: ...
+    def instances(self) -> Sequence[tuple[str, str, str | None]]:
+        ...
 
     @abstractmethod
     def get_variables(
         self,
         expression: E,
         abstract_environment: AbstractEnvironment[L],
-    ) -> tuple[Mapping[str, L], int]: ...
+    ) -> tuple[Mapping[str, L], int]:
+        ...
 
     def apply(
         self,
