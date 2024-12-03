@@ -1254,8 +1254,8 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                         self.add(new_lattice_graph)
                         self.remove(lattice_graph)
 
-                        program_point_part = table.get_variable_part(
-                            program_point, variable
+                        successor_program_point_part = table.get_variable_part(
+                            successor, variable
                         ).copy()
                         res_cond_part = res_table.get_res_cond_variable_part(
                             variable
@@ -1284,7 +1284,9 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
                         self.play(
                             Create(lattice_join_title),
-                            Transform(program_point_part, lattice_program_point_part),
+                            Transform(
+                                successor_program_point_part, lattice_program_point_part
+                            ),
                             Transform(res_cond_part, lattice_res_cond_part),
                             self.camera.frame.animate.move_to(
                                 self.lattice_camera_position
