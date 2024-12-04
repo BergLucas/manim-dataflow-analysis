@@ -84,13 +84,15 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     lattice_position: tuple[float, float, float] = (fw(1), fh(-0.0775), 0)
     lattice_camera_position: tuple[float, float, float] = (fw(1), 0, 0)
     lattice_wait_time: float = 5.0
-    lattice_join_title_template: str = "We join {abstract_value1} and {abstract_value2} which results in {joined_abstract_value}"  # noqa: E501
+    lattice_join_title_template: str = (
+        "We join {abstract_value1} and {abstract_value2} which results in {joined_abstract_value}"  # noqa: E501
+    )
     lattice_join_wait_time: float = 5.0
     lattice_max_horizontal_size_per_vertex: int = 8
     lattice_max_vertical_size: int = 8
-    sorting_function: Callable[
-        [Iterable[Hashable]], list[Hashable]
-    ] = default_sorting_function
+    sorting_function: Callable[[Iterable[Hashable]], list[Hashable]] = (
+        default_sorting_function
+    )
 
     # Control-flow function
     control_flow_function: ControlFlowFunction[L]
@@ -193,21 +195,39 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     worklist_pop_title_template: str = (
         "We remove the program point {program_point} from the worklist :"
     )
-    worklist_control_flow_function_title_template: str = "We use the control-flow function on our program point {program_point} which is the statement {statement} :"  # noqa: E501
+    worklist_control_flow_function_title_template: str = (
+        "We use the control-flow function on our program point {program_point} which is the statement {statement} :"  # noqa: E501
+    )
     worklist_flow_function_title_template: str = (
         "We use the flow function on our statement {statement} :"
     )
     worklist_condition_update_function_title_template: str = (
         "We use the condition update function on our condition {condition} :"
     )
-    worklist_control_flow_variables_title_template: str = "We update the res abstract environment with the variables\n{variables} coming from the control flow function :"  # noqa: E501
-    worklist_table_variables_title_template: str = "We update the rest of the res abstract environment with the variables\n{variables} coming from the abstract environment {program_point} :"  # noqa: E501
-    worklist_successor_title_template: str = "We try to check if we need to process the successor {successor_program_point} :"  # noqa: E501
-    worklist_condition_update_variables_title_template: str = "We update the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the condition update function :"  # noqa: E501
-    worklist_res_variables_title_template: str = "We update the rest of the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the res abstract environment :"  # noqa: E501
-    worklist_is_included_title_template: str = "res[COND(p,p')] is included in the abstract environment {successor_program_point}\nso we reached a fixed point :"  # noqa: E501
-    worklist_not_included_title_template: str = "res[COND(p,p')] is not included in the abstract environment {successor_program_point}\nso we must process the successor {successor_program_point} :"  # noqa: E501
-    worklist_joined_values_title_template: str = "We join the values from the abstract environment res[COND(p,p')] with\nthe abstract environment {program_point} :"  # noqa: E501
+    worklist_control_flow_variables_title_template: str = (
+        "We update the res abstract environment with the variables\n{variables} coming from the control flow function :"  # noqa: E501
+    )
+    worklist_table_variables_title_template: str = (
+        "We update the rest of the res abstract environment with the variables\n{variables} coming from the abstract environment {program_point} :"  # noqa: E501
+    )
+    worklist_successor_title_template: str = (
+        "We try to check if we need to process the successor {successor_program_point} :"  # noqa: E501
+    )
+    worklist_condition_update_variables_title_template: str = (
+        "We update the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the condition update function :"  # noqa: E501
+    )
+    worklist_res_variables_title_template: str = (
+        "We update the rest of the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the res abstract environment :"  # noqa: E501
+    )
+    worklist_is_included_title_template: str = (
+        "res[COND(p,p')] is included in the abstract environment {successor_program_point}\nso we reached a fixed point :"  # noqa: E501
+    )
+    worklist_not_included_title_template: str = (
+        "res[COND(p,p')] is not included in the abstract environment {successor_program_point}\nso we must process the successor {successor_program_point} :"  # noqa: E501
+    )
+    worklist_joined_values_title_template: str = (
+        "We join the values from the abstract environment res[COND(p,p')] with\nthe abstract environment {program_point} :"  # noqa: E501
+    )
     worklist_add_successor_title_template: str = (
         "We add the successor {program_point} to the worklist :"
     )
@@ -763,7 +783,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
     def move_camera_animation(self, position: tuple[float, float, float]) -> Animation:
         if isinstance(self.camera, MovingCamera):
-            return self.move_camera_animation(position)
+            return self.camera.frame.animate.move_to(position)
         elif isinstance(self.camera, OpenGLCamera):
             return self.camera.animate.move_to(position)
         else:
