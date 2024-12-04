@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from copy import deepcopy
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -25,7 +24,7 @@ from manim.mobject.text.code_mobject import Code
 from manim.mobject.text.text_mobject import Text
 from manim.renderer.opengl_renderer import OpenGLCamera
 from manim.scene.zoomed_scene import MovingCameraScene
-from manim.utils.color import ORANGE
+from manim.utils.color import ORANGE, WHITE
 
 from manim_dataflow_analysis.abstract_environment import (
     AbstractEnvironment,
@@ -84,15 +83,13 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     lattice_position: tuple[float, float, float] = (fw(1), fh(-0.0775), 0)
     lattice_camera_position: tuple[float, float, float] = (fw(1), 0, 0)
     lattice_wait_time: float = 5.0
-    lattice_join_title_template: str = (
-        "We join {abstract_value1} and {abstract_value2} which results in {joined_abstract_value}"  # noqa: E501
-    )
+    lattice_join_title_template: str = "We join {abstract_value1} and {abstract_value2} which results in {joined_abstract_value}"  # noqa: E501
     lattice_join_wait_time: float = 5.0
     lattice_max_horizontal_size_per_vertex: int = 8
     lattice_max_vertical_size: int = 8
-    sorting_function: Callable[[Iterable[Hashable]], list[Hashable]] = (
-        default_sorting_function
-    )
+    sorting_function: Callable[
+        [Iterable[Hashable]], list[Hashable]
+    ] = default_sorting_function
 
     # Control-flow function
     control_flow_function: ControlFlowFunction[L]
@@ -195,39 +192,21 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     worklist_pop_title_template: str = (
         "We remove the program point {program_point} from the worklist :"
     )
-    worklist_control_flow_function_title_template: str = (
-        "We use the control-flow function on our program point {program_point} which is the statement {statement} :"  # noqa: E501
-    )
+    worklist_control_flow_function_title_template: str = "We use the control-flow function on our program point {program_point} which is the statement {statement} :"  # noqa: E501
     worklist_flow_function_title_template: str = (
         "We use the flow function on our statement {statement} :"
     )
     worklist_condition_update_function_title_template: str = (
         "We use the condition update function on our condition {condition} :"
     )
-    worklist_control_flow_variables_title_template: str = (
-        "We update the res abstract environment with the variables\n{variables} coming from the control flow function :"  # noqa: E501
-    )
-    worklist_table_variables_title_template: str = (
-        "We update the rest of the res abstract environment with the variables\n{variables} coming from the abstract environment {program_point} :"  # noqa: E501
-    )
-    worklist_successor_title_template: str = (
-        "We try to check if we need to process the successor {successor_program_point} :"  # noqa: E501
-    )
-    worklist_condition_update_variables_title_template: str = (
-        "We update the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the condition update function :"  # noqa: E501
-    )
-    worklist_res_variables_title_template: str = (
-        "We update the rest of the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the res abstract environment :"  # noqa: E501
-    )
-    worklist_is_included_title_template: str = (
-        "res[COND(p,p')] is included in the abstract environment {successor_program_point}\nso we reached a fixed point :"  # noqa: E501
-    )
-    worklist_not_included_title_template: str = (
-        "res[COND(p,p')] is not included in the abstract environment {successor_program_point}\nso we must process the successor {successor_program_point} :"  # noqa: E501
-    )
-    worklist_joined_values_title_template: str = (
-        "We join the values from the abstract environment res[COND(p,p')] with\nthe abstract environment {program_point} :"  # noqa: E501
-    )
+    worklist_control_flow_variables_title_template: str = "We update the res abstract environment with the variables\n{variables} coming from the control flow function :"  # noqa: E501
+    worklist_table_variables_title_template: str = "We update the rest of the res abstract environment with the variables\n{variables} coming from the abstract environment {program_point} :"  # noqa: E501
+    worklist_successor_title_template: str = "We try to check if we need to process the successor {successor_program_point} :"  # noqa: E501
+    worklist_condition_update_variables_title_template: str = "We update the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the condition update function :"  # noqa: E501
+    worklist_res_variables_title_template: str = "We update the rest of the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the res abstract environment :"  # noqa: E501
+    worklist_is_included_title_template: str = "res[COND(p,p')] is included in the abstract environment {successor_program_point}\nso we reached a fixed point :"  # noqa: E501
+    worklist_not_included_title_template: str = "res[COND(p,p')] is not included in the abstract environment {successor_program_point}\nso we must process the successor {successor_program_point} :"  # noqa: E501
+    worklist_joined_values_title_template: str = "We join the values from the abstract environment res[COND(p,p')] with\nthe abstract environment {program_point} :"  # noqa: E501
     worklist_add_successor_title_template: str = (
         "We add the successor {program_point} to the worklist :"
     )
@@ -914,7 +893,8 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     flow_instance_id
                 )
 
-            program_point_label = deepcopy(cfg.labels[program_point])
+            program_point_label = cfg.labels[program_point].copy()
+            program_point_label.color = WHITE
 
             self.add(control_flow_function_tex, flow_function_tex)
 
@@ -1080,8 +1060,10 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     res,
                 )
 
-                program_point_label = deepcopy(cfg.labels[program_point])
-                successor_program_point_label = deepcopy(cfg.labels[successor])
+                program_point_label = cfg.labels[program_point].copy()
+                program_point_label.color = WHITE
+                successor_program_point_label = cfg.labels[successor].copy()
+                successor_program_point_label.color = WHITE
 
                 condition_update_function_instance = (
                     condition_update_function_tex.get_instance_part(
@@ -1279,6 +1261,13 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                         self.add(lattice_graph)
                         self.play(FadeTransform(lattice_graph, new_lattice_graph))
 
+                        new_lattice_graph.color_path(
+                            current_abstract_value, joined_abstract_value
+                        )
+                        new_lattice_graph.color_path(
+                            successor_abstract_value, joined_abstract_value
+                        )
+
                         self.add(new_lattice_graph)
                         self.remove(lattice_graph)
 
@@ -1289,10 +1278,10 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                             variable
                         ).copy()
 
-                        lattice_res_cond_part = lattice_graph.labels[
+                        lattice_res_cond_part = new_lattice_graph.labels[
                             current_abstract_value
                         ]
-                        lattice_successor_part = lattice_graph.labels[
+                        lattice_successor_part = new_lattice_graph.labels[
                             successor_abstract_value
                         ]
 
@@ -1319,20 +1308,13 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                             self.move_camera_animation(self.lattice_camera_position),
                         )
 
-                        self.remove(lattice_successor_part, lattice_res_cond_part)
-
-                        new_lattice_graph.color_path(
-                            current_abstract_value, joined_abstract_value
-                        )
-                        new_lattice_graph.color_path(
-                            successor_abstract_value, joined_abstract_value
-                        )
+                        self.remove(successor_program_point_part, res_cond_part)
 
                         self.wait(self.lattice_join_wait_time)
 
-                        lattice_joined_part = deepcopy(
-                            lattice_graph.labels[joined_abstract_value]
-                        )
+                        lattice_joined_part = new_lattice_graph.labels[
+                            joined_abstract_value
+                        ].copy()
 
                         with (
                             self.animate_mobject(
