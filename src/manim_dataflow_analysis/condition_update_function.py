@@ -27,7 +27,7 @@ class ConditionUpdateFunction(Protocol[L, E_contra]):
         abstract_environment: AbstractEnvironment[L],
     ) -> tuple[AbstractEnvironment[L], int]:
         variables, instance_id = self.get_variables(expression, abstract_environment)
-        return abstract_environment.set(**variables), instance_id
+        return abstract_environment.set(variables), instance_id
 
     def apply_and_get_variables(
         self,
@@ -35,4 +35,4 @@ class ConditionUpdateFunction(Protocol[L, E_contra]):
         abstract_environment: AbstractEnvironment[L],
     ) -> tuple[AbstractEnvironment[L], Mapping[str, L], int]:
         variables, instance_id = self.get_variables(expression, abstract_environment)
-        return abstract_environment.set(**variables), variables, instance_id
+        return abstract_environment.set(variables), variables, instance_id

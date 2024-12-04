@@ -1248,7 +1248,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
                         abstract_environments[successor] = abstract_environments[
                             successor
-                        ].set(**{variable: joined_abstract_value})
+                        ].set({variable: joined_abstract_value})
 
                         new_lattice_graph = self.create_lattice_graph(
                             {

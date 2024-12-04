@@ -28,7 +28,7 @@ class FlowFunction(Protocol[L]):
         abstract_environment: AbstractEnvironment[L],
     ) -> tuple[AbstractEnvironment[L], int]:
         variables, instance_id = self.get_variables(statement, abstract_environment)
-        return abstract_environment.set(**variables), instance_id
+        return abstract_environment.set(variables), instance_id
 
     def apply_and_get_variables(
         self,
@@ -36,7 +36,7 @@ class FlowFunction(Protocol[L]):
         abstract_environment: AbstractEnvironment[L],
     ) -> tuple[AbstractEnvironment[L], Mapping[str, L], int]:
         variables, instance_id = self.get_variables(statement, abstract_environment)
-        return abstract_environment.set(**variables), variables, instance_id
+        return abstract_environment.set(variables), variables, instance_id
 
 
 class ControlFlowFunction(Protocol[L]):
@@ -64,7 +64,7 @@ class ControlFlowFunction(Protocol[L]):
         abstract_environment: AbstractEnvironment[L],
     ) -> tuple[AbstractEnvironment[L], int | tuple[int, int]]:
         variables, instance_id = self.get_variables(program_point, abstract_environment)
-        return abstract_environment.set(**variables), instance_id
+        return abstract_environment.set(variables), instance_id
 
     def apply_and_get_variables(
         self,
@@ -72,4 +72,4 @@ class ControlFlowFunction(Protocol[L]):
         abstract_environment: AbstractEnvironment[L],
     ) -> tuple[AbstractEnvironment[L], Mapping[str, L], int | tuple[int, int]]:
         variables, instance_id = self.get_variables(program_point, abstract_environment)
-        return abstract_environment.set(**variables), variables, instance_id
+        return abstract_environment.set(variables), variables, instance_id

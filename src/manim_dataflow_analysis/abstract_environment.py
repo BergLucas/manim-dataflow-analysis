@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generator, Generic, Iterable, TypeVar
+from typing import TYPE_CHECKING, Generator, Generic, Iterable, Mapping, TypeVar
 
 from frozendict import frozendict
 from manim.mobject.text.tex_mobject import MathTex, SingleStringMathTex
@@ -48,7 +48,7 @@ class AbstractEnvironment(Generic[L]):
     def includes(self, other: AbstractEnvironment[L]) -> bool:
         return all(included for _, included in self.includes_generator(other))
 
-    def set(self, **variables: L) -> AbstractEnvironment[L]:
+    def set(self, variables: Mapping[str, L]) -> AbstractEnvironment[L]:
         return AbstractEnvironment(self.lattice, self.variables | variables)
 
     def __getitem__(self, variable: str) -> L:
