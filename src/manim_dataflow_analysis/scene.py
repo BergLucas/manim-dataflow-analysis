@@ -17,11 +17,13 @@ from frozendict import frozendict
 from manim import config
 from manim.animation.creation import Create, Uncreate, Unwrite, Write
 from manim.animation.transform import FadeTransform, Transform
+from manim.camera.moving_camera import MovingCamera
 from manim.mobject.geometry.line import Arrow
 from manim.mobject.geometry.shape_matchers import SurroundingRectangle
 from manim.mobject.mobject import Mobject
 from manim.mobject.text.code_mobject import Code
 from manim.mobject.text.text_mobject import Text
+from manim.renderer.opengl_renderer import OpenGLCamera
 from manim.scene.zoomed_scene import MovingCameraScene
 from manim.utils.color import ORANGE
 
@@ -474,7 +476,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
         if condition_rectangle is not None:
             self.play(
-                self.camera.frame.animate.move_to(self.flow_function_camera_position),
+                self.move_camera_animation(self.flow_function_camera_position),
                 Create(worklist_flow_function_title),
                 Create(condition_rectangle),
                 Transform(control_flow_modification, instance),
@@ -759,6 +761,14 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
         return worklist_tex
 
+    def move_camera_animation(self, position: tuple[float, float, float]) -> Animation:
+        if isinstance(self.camera, MovingCamera):
+            return self.move_camera_animation(position)
+        elif isinstance(self.camera, OpenGLCamera):
+            return self.camera.animate.move_to(position)
+        else:
+            raise NotImplementedError("Unsupported camera type")
+
     def worklist(
         self,
         entry_point: ProgramPoint,
@@ -891,9 +901,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
             self.play(
                 Uncreate(worklist_pop_title),
                 Transform(program_point_label, control_flow_function_instance),
-                self.camera.frame.animate.move_to(
-                    self.control_flow_function_camera_position
-                ),
+                self.move_camera_animation(self.control_flow_function_camera_position),
             )
             self.remove(program_point_label)
 
@@ -934,7 +942,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                 )
                 self.play(
                     Create(worklist_control_flow_variables_title),
-                    self.camera.frame.animate.move_to(self.worklist_camera_position),
+                    self.move_camera_animation(self.worklist_camera_position),
                     res_table_animation,
                     *(Transform(*res_part) for res_part in res_parts),
                 )
@@ -1074,7 +1082,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                         successor_program_point_label,
                         condition_update_function_instance,
                     ),
-                    self.camera.frame.animate.move_to(
+                    self.move_camera_animation(
                         self.condition_update_function_camera_position
                     ),
                 )
@@ -1121,9 +1129,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     )
                     self.play(
                         Create(worklist_condition_update_variables_title),
-                        self.camera.frame.animate.move_to(
-                            self.worklist_camera_position
-                        ),
+                        self.move_camera_animation(self.worklist_camera_position),
                         res_cond_table_animation,
                         *(
                             Transform(*res_cond_part)
@@ -1290,9 +1296,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                                 successor_program_point_part, lattice_successor_part
                             ),
                             Transform(res_cond_part, lattice_res_cond_part),
-                            self.camera.frame.animate.move_to(
-                                self.lattice_camera_position
-                            ),
+                            self.move_camera_animation(self.lattice_camera_position),
                         )
 
                         self.remove(lattice_successor_part, lattice_res_cond_part)
@@ -1327,7 +1331,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                                     lattice_joined_part,
                                     table.get_variable_part(successor, variable),
                                 ),
-                                self.camera.frame.animate.move_to(
+                                self.move_camera_animation(
                                     self.worklist_camera_position
                                 ),
                                 table_animation,
@@ -1435,18 +1439,16 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         self.wait(self.worklist_wait_time)
 
     def construct(self):
-        self.play(self.camera.frame.animate.move_to(self.title_camera_position))
+        self.play(self.move_camera_animation(self.title_camera_position))
 
         self.show_title()
 
-        self.play(self.camera.frame.animate.move_to(self.lattice_camera_position))
+        self.play(self.move_camera_animation(self.lattice_camera_position))
 
         lattice_graph = self.show_lattice_graph()
 
         self.play(
-            self.camera.frame.animate.move_to(
-                self.control_flow_function_camera_position
-            )
+            self.move_camera_animation(self.control_flow_function_camera_position)
         )
 
         # Temporary remove tex to improve performance
@@ -1454,19 +1456,17 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
         control_flow_function_tex = self.show_control_flow_function()
 
-        self.play(self.camera.frame.animate.move_to(self.flow_function_camera_position))
+        self.play(self.move_camera_animation(self.flow_function_camera_position))
 
         flow_function_tex = self.show_flow_function()
 
         self.play(
-            self.camera.frame.animate.move_to(
-                self.condition_update_function_camera_position
-            )
+            self.move_camera_animation(self.condition_update_function_camera_position)
         )
 
         condition_update_function_tex = self.show_condition_update_function()
 
-        self.play(self.camera.frame.animate.move_to(self.program_camera_position))
+        self.play(self.move_camera_animation(self.program_camera_position))
 
         # Temporary remove tex to improve performance
         if flow_function_tex is not None:
@@ -1479,13 +1479,11 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
         program = self.show_program()
 
-        self.play(
-            self.camera.frame.animate.move_to(self.program_conversion_camera_position)
-        )
+        self.play(self.move_camera_animation(self.program_conversion_camera_position))
 
         entry_point, program_cfg, cfg = self.show_program_conversion(program)
 
-        self.play(self.camera.frame.animate.move_to(self.worklist_camera_position))
+        self.play(self.move_camera_animation(self.worklist_camera_position))
 
         self.worklist(
             entry_point,
