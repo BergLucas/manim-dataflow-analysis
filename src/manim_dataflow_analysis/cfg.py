@@ -173,16 +173,17 @@ def __cfg_node_depth(
 
             _, vertex_done_override_coord_y = coords[vertex_done_override]
 
-            if y_done_override <= vertex_done_override_coord_y:
+            y_done_override_difference = y_done_override - vertex_done_override_coord_y
+            if y_done_override_difference <= 0:
                 continue
 
             for coord_vertex, (coord_x, coord_y) in coords.items():
                 coords[coord_vertex] = (
                     coord_x,
-                    coord_y + y_done_override - vertex_done_override_coord_y,
+                    coord_y + y_done_override_difference,
                 )
 
-            all_successors_height += y_done_override - vertex_done_override_coord_y
+            all_successors_height += y_done_override_difference
 
         all_successors_width += successor_width
 
