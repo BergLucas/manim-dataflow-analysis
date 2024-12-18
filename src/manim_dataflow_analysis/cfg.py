@@ -123,16 +123,6 @@ def __cfg_successors(
     return list(successors_condition)
 
 
-def __move_coord_down(coords: dict[Hashable, tuple[int, int]], height: int) -> bool:
-    if height <= 0:
-        return False
-
-    for vertex, (coord_x, coord_y) in coords.items():
-        coords[vertex] = (coord_x, coord_y + height)
-
-    return True
-
-
 CURRENT_VERTEX_WIDTH = 1
 CURRENT_VERTEX_HEIGHT = 1
 
@@ -171,7 +161,9 @@ def __cfg_node_depth(
         )
 
         height_difference = successor_height - all_successors_height
-        if __move_coord_down(coords, height_difference):
+        if height_difference > 0:
+            for coord_vertex, (coord_x, coord_y) in coords.items():
+                coords[coord_vertex] = (coord_x, coord_y + height_difference)
             all_successors_height += height_difference
 
         for vertex_done_override, y_done_override in successor_done_override.items():
