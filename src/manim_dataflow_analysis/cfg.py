@@ -123,12 +123,18 @@ def __cfg_successors(
     return list(successors_condition)
 
 
-def __move_coord_down(coords: dict[Hashable, tuple[int, int]], y: int) -> None:
-    if y <= 0:
-        return
+def __move_coord_down(coords: dict[Hashable, tuple[int, int]], height: int) -> bool:
+    if height <= 0:
+        return False
 
     for vertex, (coord_x, coord_y) in coords.items():
-        coords[vertex] = (coord_x, coord_y + y)
+        coords[vertex] = (coord_x, coord_y + height)
+
+    return True
+
+
+CURRENT_VERTEX_WIDTH = 1
+CURRENT_VERTEX_HEIGHT = 1
 
 
 def __cfg_node_depth(
@@ -140,22 +146,16 @@ def __cfg_node_depth(
     y: int = 0,
 ) -> tuple[int, int, dict[Hashable, int], dict[Hashable, tuple[int, int]]]:
     if vertex in done:
-        return 1, 0, {vertex: y}, {}
+        return 0, 0, {vertex: y}, {}
 
     done.add(vertex)
 
-    successors = __cfg_successors(graph, vertex, condition_vertices)
-
-    if not successors:
-        return 1, 1, {}, {vertex: (x, y)}
-
-    current_width = 0
-    current_height = 0
-
+    all_successors_width = 0
+    all_successors_height = 0
     done_override: dict[Hashable, int] = {}
     coords: dict[Hashable, tuple[int, int]] = {}
 
-    for successor in successors:
+    for successor in __cfg_successors(graph, vertex, condition_vertices):
         (
             successor_width,
             successor_height,
@@ -166,14 +166,13 @@ def __cfg_node_depth(
             successor,
             condition_vertices,
             done,
-            x + current_width,
-            y + 1,
+            x + all_successors_width,
+            y + CURRENT_VERTEX_HEIGHT,
         )
 
-        # Move the coords down if the successor goes below the current height
-        height_difference = successor_height - current_height
-        __move_coord_down(coords, height_difference)
-        current_height += height_difference
+        height_difference = successor_height - all_successors_height
+        if __move_coord_down(coords, height_difference):
+            all_successors_height += height_difference
 
         for vertex_done_override, y_done_override in successor_done_override.items():
             if vertex_done_override not in coords:
@@ -191,15 +190,20 @@ def __cfg_node_depth(
                     coord_y + y_done_override - vertex_done_override_coord_y,
                 )
 
-            current_height += y_done_override - vertex_done_override_coord_y
+            all_successors_height += y_done_override - vertex_done_override_coord_y
 
-        current_width += successor_width
+        all_successors_width += successor_width
 
         coords.update(successors_coords)
 
     coords[vertex] = (x, y)
 
-    return current_width, 1 + current_height, done_override, coords
+    return (
+        max(CURRENT_VERTEX_WIDTH, all_successors_width),
+        CURRENT_VERTEX_HEIGHT + all_successors_height,
+        done_override,
+        coords,
+    )
 
 
 def cfg_layout(
