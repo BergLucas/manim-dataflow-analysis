@@ -21,17 +21,18 @@ class AstStatement(Protocol):
             The header of the AST statement.
         """
 
-    @abstractmethod
-    def __str__(self) -> str:
-        """Convert the AST statement to its string form.
-
-        Returns:
-            The string representation of the AST statement.
-        """
-
 
 class AstFunction(Protocol):
     """A function in its AST form."""
+
+    @property
+    def line_number(self) -> int:
+        """The line number of the AST function.
+
+        Returns:
+            The line number of the AST function.
+        """
+        return 1
 
     @property
     @abstractmethod
