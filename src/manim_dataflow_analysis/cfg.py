@@ -147,9 +147,9 @@ def __cfg_node_depth(
 
     for successor in __cfg_successors(graph, vertex, condition_vertices):
         (
-            successor_width,
-            successor_height,
-            successor_done_override,
+            successors_width,
+            successors_height,
+            successors_done_override,
             successors_coords,
         ) = __cfg_node_depth(
             graph,
@@ -160,13 +160,13 @@ def __cfg_node_depth(
             y + CURRENT_VERTEX_HEIGHT,
         )
 
-        height_difference = successor_height - all_successors_height
+        height_difference = successors_height - all_successors_height
         if height_difference > 0:
             for coord_vertex, (coord_x, coord_y) in coords.items():
                 coords[coord_vertex] = (coord_x, coord_y + height_difference)
             all_successors_height += height_difference
 
-        for vertex_done_override, y_done_override in successor_done_override.items():
+        for vertex_done_override, y_done_override in successors_done_override.items():
             if vertex_done_override not in coords:
                 done_override[vertex_done_override] = y_done_override
                 continue
@@ -193,7 +193,30 @@ def __cfg_node_depth(
 
             all_successors_height += y_done_override_difference
 
-        all_successors_width += successor_width
+            max_width_next_to_successors = CURRENT_VERTEX_WIDTH + max(
+                (
+                    coord_x - x
+                    for coord_x, coord_y in coords.values()
+                    if y < coord_y and coord_y < y_done_override
+                ),
+                default=0,
+            )
+
+            width_difference = all_successors_width - max_width_next_to_successors
+
+            if width_difference > 0:
+                for coord_vertex, (coord_x, coord_y) in successors_coords.items():
+                    if coord_y <= y or y_done_override <= coord_y:
+                        continue
+
+                    successors_coords[coord_vertex] = (
+                        coord_x - width_difference,
+                        coord_y,
+                    )
+
+                successors_width -= width_difference
+
+        all_successors_width += successors_width
 
         coords.update(successors_coords)
 
