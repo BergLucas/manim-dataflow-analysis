@@ -58,26 +58,19 @@ class PathArrow(TipableVMobject):
 
 
 class GraphNode(Protocol):
-    def get_center(self) -> Point3D:
-        ...
+    def get_center(self) -> Point3D: ...
 
-    def get_top(self) -> Point3D:
-        ...
+    def get_top(self) -> Point3D: ...
 
-    def get_bottom(self) -> Point3D:
-        ...
+    def get_bottom(self) -> Point3D: ...
 
-    def get_right(self) -> Point3D:
-        ...
+    def get_right(self) -> Point3D: ...
 
-    def get_left(self) -> Point3D:
-        ...
+    def get_left(self) -> Point3D: ...
 
-    def get_zenith(self) -> Point3D:
-        ...
+    def get_zenith(self) -> Point3D: ...
 
-    def get_nadir(self) -> Point3D:
-        ...
+    def get_nadir(self) -> Point3D: ...
 
 
 class EdgeLayoutFunction(Protocol):
@@ -86,8 +79,7 @@ class EdgeLayoutFunction(Protocol):
         vertices: dict[Hashable, GraphNode],
         start: Hashable,
         end: Hashable,
-    ) -> list[Point3D]:
-        ...
+    ) -> list[Point3D]: ...
 
 
 def default_edge_layout(
@@ -105,8 +97,10 @@ class LayoutAndEdgeLayoutFunction(Protocol):
         scale: float | tuple[float, float, float] = 2,
         *args: Any,
         **kwargs: Any,
-    ) -> tuple[dict[Hashable, Point3D], EdgeLayoutFunction,]:
-        ...
+    ) -> tuple[
+        dict[Hashable, Point3D],
+        EdgeLayoutFunction,
+    ]: ...
 
 
 def __cfg_successors(
@@ -129,6 +123,14 @@ def __cfg_successors(
     return list(successors_condition)
 
 
+def __move_coord_down(coords: dict[Hashable, tuple[int, int]], y: int) -> None:
+    if y <= 0:
+        return
+
+    for vertex, (coord_x, coord_y) in coords.items():
+        coords[vertex] = (coord_x, coord_y + y)
+
+
 def __cfg_node_depth(
     graph: NxGraph,
     vertex: Hashable,
@@ -136,52 +138,16 @@ def __cfg_node_depth(
     done: set[Hashable],
     x: int = 0,
     y: int = 0,
-    max_y: int = 0,
-) -> tuple[int, int, int, dict[Hashable, int], dict[Hashable, tuple[int, int]]]:
+) -> tuple[int, int, dict[Hashable, int], dict[Hashable, tuple[int, int]]]:
     if vertex in done:
-        return 1, 0, max_y, {vertex: y}, {}
+        return 1, 0, {vertex: y}, {}
 
     done.add(vertex)
 
     successors = __cfg_successors(graph, vertex, condition_vertices)
 
-    current_max_y = max(y, max_y)
-
     if not successors:
-        return 1, 1, current_max_y, {}, {vertex: (x, current_max_y)}
-
-    if len(successors) == 1:
-        (
-            successor_width,
-            successor_height,
-            successor_max_y,
-            successor_done_override,
-            successors_coords,
-        ) = __cfg_node_depth(
-            graph,
-            successors[0],
-            condition_vertices,
-            done,
-            x,
-            y + 1,
-            current_max_y,
-        )
-
-        if successor_max_y > current_max_y:
-            successors_coords[vertex] = (
-                x,
-                y + successor_max_y - current_max_y - successor_height,
-            )
-        else:
-            successors_coords[vertex] = (x, y)
-
-        return (
-            successor_width,
-            1 + successor_height,
-            successor_max_y,
-            successor_done_override,
-            successors_coords,
-        )
+        return 1, 1, {}, {vertex: (x, y)}
 
     current_width = 0
     current_height = 0
@@ -193,7 +159,6 @@ def __cfg_node_depth(
         (
             successor_width,
             successor_height,
-            successor_max_y,
             successor_done_override,
             successors_coords,
         ) = __cfg_node_depth(
@@ -203,26 +168,12 @@ def __cfg_node_depth(
             done,
             x + current_width,
             y + 1,
-            current_max_y,
         )
 
-        current_width += successor_width
-
-        if successor_height > current_height:
-            for coord_vertex, (coord_x, coord_y) in coords.items():
-                coords[coord_vertex] = (
-                    coord_x,
-                    coord_y + successor_height - current_height,
-                )
-            current_height = successor_height
-
-        if successor_max_y > current_max_y:
-            for coord_vertex, (coord_x, coord_y) in coords.items():
-                coords[coord_vertex] = (
-                    coord_x,
-                    coord_y + successor_max_y - current_max_y,
-                )
-            current_max_y = successor_max_y
+        # Move the coords down if the successor goes below the current height
+        height_difference = successor_height - current_height
+        __move_coord_down(coords, height_difference)
+        current_height += height_difference
 
         for vertex_done_override, y_done_override in successor_done_override.items():
             if vertex_done_override not in coords:
@@ -234,20 +185,21 @@ def __cfg_node_depth(
             if y_done_override <= vertex_done_override_coord_y:
                 continue
 
-            current_height += 1
-
             for coord_vertex, (coord_x, coord_y) in coords.items():
-                if coord_y >= vertex_done_override_coord_y:
-                    coords[coord_vertex] = (
-                        coord_x,
-                        y + current_height + coord_y - vertex_done_override_coord_y,
-                    )
+                coords[coord_vertex] = (
+                    coord_x,
+                    coord_y + y_done_override - vertex_done_override_coord_y,
+                )
+
+            current_height += y_done_override - vertex_done_override_coord_y
+
+        current_width += successor_width
 
         coords.update(successors_coords)
 
     coords[vertex] = (x, y)
 
-    return current_width, 1 + current_height, 0, done_override, coords
+    return current_width, 1 + current_height, done_override, coords
 
 
 def cfg_layout(
@@ -256,7 +208,10 @@ def cfg_layout(
     scale: float | tuple[float, float, float] = 2,
     condition_vertices: dict[Hashable, tuple[Hashable]] | None = None,
     vertex_spacing: tuple[float, float] = (1, 1),
-) -> tuple[dict[Hashable, Point3D], EdgeLayoutFunction,]:
+) -> tuple[
+    dict[Hashable, Point3D],
+    EdgeLayoutFunction,
+]:
     if condition_vertices is None:
         raise ValueError("The CFG layout requires the condition vertices to be passed")
 
@@ -268,7 +223,7 @@ def cfg_layout(
     else:
         scale_x = scale_y = 1
 
-    width, height, _, _, coords = __cfg_node_depth(
+    width, height, _, coords = __cfg_node_depth(
         graph,
         root_vertex,
         condition_vertices,
