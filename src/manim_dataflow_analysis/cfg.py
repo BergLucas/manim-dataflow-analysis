@@ -178,6 +178,9 @@ def __cfg_node_depth(
                 continue
 
             for coord_vertex, (coord_x, coord_y) in coords.items():
+                if coord_y < vertex_done_override_coord_y:
+                    continue
+
                 coords[coord_vertex] = (
                     coord_x,
                     coord_y + y_done_override_difference,
