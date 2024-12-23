@@ -218,6 +218,29 @@ def __cfg_node_depth(
 
             all_successors_height += y_done_override_difference
 
+        max_width_next_to_successors = VERTEX_WIDTH + max(
+            (
+                coord_x - x
+                for coord_x, coord_y in coords.values()
+                if y < coord_y and coord_y < y_done_override
+            ),
+            default=0,
+        )
+
+        width_difference = all_successors_width - max_width_next_to_successors
+
+        if width_difference > 0:
+            for coord_vertex, (coord_x, coord_y) in successors_coords.items():
+                if coord_y <= y or y_done_override <= coord_y:
+                    continue
+
+                successors_coords[coord_vertex] = (
+                    coord_x - width_difference,
+                    coord_y,
+                )
+
+            successors_width -= width_difference
+
         all_successors_width += successors_width
 
         for vertex_done_override in successors_done_override:
