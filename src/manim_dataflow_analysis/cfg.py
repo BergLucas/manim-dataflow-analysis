@@ -168,7 +168,16 @@ def __cfg_node_depth(
             y + VERTEX_HEIGHT,
         )
 
-        height_difference = successors_height - all_successors_height
+        successors_done_override_in_coords = tuple(
+            y for vertex, y in successors_done_override.items() if vertex in coords
+        )
+
+        if successors_done_override_in_coords:
+            current_height = max(successors_done_override_in_coords, default=0) - y
+        else:
+            current_height = all_successors_height
+
+        height_difference = successors_height - current_height
         if height_difference > 0:
             for coord_vertex, (coord_x, coord_y) in coords.items():
                 coords[coord_vertex] = (coord_x, coord_y + height_difference)
@@ -179,6 +188,9 @@ def __cfg_node_depth(
             all_successors_height += height_difference
 
         for vertex_done_override, y_done_override in successors_done_override.items():
+            if vertex_done_override == vertex:
+                continue
+
             if vertex_done_override not in coords:
                 done_override[vertex_done_override] = y_done_override
                 continue
@@ -212,19 +224,19 @@ def __cfg_node_depth(
             if vertex_done_override != vertex:
                 continue
 
-            additional_loop_height = VERTEX_HEIGHT
-
-            all_successors_height += additional_loop_height
+            all_successors_height += VERTEX_HEIGHT
 
             for coord_vertex, (coord_x, coord_y) in coords.items():
-                coords[coord_vertex] = (coord_x, coord_y + additional_loop_height)
+                coords[coord_vertex] = (coord_x, coord_y + VERTEX_HEIGHT)
 
             for coord_vertex, coord_y in done_override.items():
-                done_override[coord_vertex] = coord_y + additional_loop_height
+                done_override[coord_vertex] = coord_y + VERTEX_HEIGHT
 
-            loop_width = loops.get(vertex, 0)
-
-            loops[vertex] = max(max(VERTEX_WIDTH, all_successors_width), loop_width)
+            loops[vertex] = max(
+                VERTEX_WIDTH,
+                all_successors_width,
+                loops.get(vertex, 0),
+            )
 
         coords.update(successors_coords)
         loops.update(successors_loops)
