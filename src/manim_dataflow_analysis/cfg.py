@@ -8,7 +8,7 @@ import networkx as nx
 import numpy as np
 from manim.mobject.geometry.arc import TipableVMobject
 from manim.mobject.text.tex_mobject import SingleStringMathTex, Tex
-from manim.utils.color import BLACK, GREEN, RED
+from manim.utils.color import BLACK, GREEN, RED, WHITE
 
 from manim_dataflow_analysis.graph import BetterDiGraph, LabeledRectangle
 
@@ -385,13 +385,9 @@ class ControlFlowGraph(BetterDiGraph):
         for start, ends in condition_vertices.items():
             for i, end in enumerate(ends):
                 if i == 0:
-                    color = RED
+                    edge_config[(start, end)] = {"color": RED}
                 elif i == 1:
-                    color = GREEN
-                else:
-                    color = BLACK
-
-                edge_config[(start, end)] = {"color": color}
+                    edge_config[(start, end)] = {"color": GREEN}
 
         return cls.from_networkx(
             cfg,
@@ -451,9 +447,14 @@ class ControlFlowGraph(BetterDiGraph):
         edge_type: type[PathArrow],
         edge_config: dict,
     ):
+        if edge_config is not None and "color" in edge_config:
+            z_index = -1
+        else:
+            z_index = -2
+
         return edge_type(
             *self._edge_layout(self.vertices, start, end),
-            z_index=-1,
+            z_index=z_index,
             **edge_config,
         )
 
