@@ -172,6 +172,10 @@ def __cfg_node_depth(
         if height_difference > 0:
             for coord_vertex, (coord_x, coord_y) in coords.items():
                 coords[coord_vertex] = (coord_x, coord_y + height_difference)
+
+            for coord_vertex, coord_y in done_override.items():
+                done_override[coord_vertex] = coord_y + height_difference
+
             all_successors_height += height_difference
 
         for vertex_done_override, y_done_override in successors_done_override.items():
@@ -194,6 +198,12 @@ def __cfg_node_depth(
                     coord_y + y_done_override_difference,
                 )
 
+            for coord_vertex, coord_y in done_override.items():
+                if coord_y < vertex_done_override_coord_y:
+                    continue
+
+                done_override[coord_vertex] = coord_y + y_done_override_difference
+
             all_successors_height += y_done_override_difference
 
         all_successors_width += successors_width
@@ -202,13 +212,15 @@ def __cfg_node_depth(
             if vertex_done_override != vertex:
                 continue
 
-            all_successors_height += VERTEX_HEIGHT
+            additional_loop_height = VERTEX_HEIGHT
+
+            all_successors_height += additional_loop_height
 
             for coord_vertex, (coord_x, coord_y) in coords.items():
-                coords[coord_vertex] = (
-                    coord_x,
-                    coord_y + VERTEX_HEIGHT,
-                )
+                coords[coord_vertex] = (coord_x, coord_y + additional_loop_height)
+
+            for coord_vertex, coord_y in done_override.items():
+                done_override[coord_vertex] = coord_y + additional_loop_height
 
             loop_width = loops.get(vertex, 0)
 
