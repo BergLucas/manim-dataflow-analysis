@@ -168,6 +168,8 @@ def __cfg_node_depth(
             y + VERTEX_HEIGHT,
         )
 
+        # Decrease the y positions of the already placed vertices if we found that the
+        # height of the successors would go beyond the current height
         successors_done_override_in_coords = tuple(
             y for vertex, y in successors_done_override.items() if vertex in coords
         )
@@ -187,6 +189,8 @@ def __cfg_node_depth(
 
             all_successors_height += height_difference
 
+        # Decrease the y positions of the already placed vertices if we found that a
+        # already placed vertex would be lower if it was placed after the successors
         for vertex_done_override, y_done_override in successors_done_override.items():
             if vertex_done_override == vertex:
                 continue
@@ -218,6 +222,8 @@ def __cfg_node_depth(
 
             all_successors_height += y_done_override_difference
 
+        # Decrease the x positions of the already placed vertices if there is some
+        # space next to the successors
         max_width_next_to_successors = VERTEX_WIDTH + max(
             (
                 coord_x - x
@@ -243,6 +249,7 @@ def __cfg_node_depth(
 
         all_successors_width += successors_width
 
+        # Increase the height when the vertex is a loop to improve readability
         for vertex_done_override in successors_done_override:
             if vertex_done_override != vertex:
                 continue
@@ -261,9 +268,11 @@ def __cfg_node_depth(
                 loops.get(vertex, 0),
             )
 
+        # Update the coords and loops with the successors coords and loops
         coords.update(successors_coords)
         loops.update(successors_loops)
 
+        # Increase the width when we have a fork that has no successors
         if not successors_coords:
             all_successors_width += VERTEX_WIDTH
 
