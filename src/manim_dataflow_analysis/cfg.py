@@ -139,7 +139,7 @@ def __cfg_node_depth(
     int,
     dict[Hashable, int],
     dict[Hashable, tuple[int, int]],
-    dict[Hashable, int],
+    dict[Hashable, tuple[int, int]],
 ]:
     if vertex in done:
         return 0, 0, {vertex: y}, {}, {}
@@ -150,7 +150,7 @@ def __cfg_node_depth(
     all_successors_height = 0
     done_override: dict[Hashable, int] = {}
     coords: dict[Hashable, tuple[int, int]] = {}
-    loops: dict[Hashable, int] = {}
+    loops: dict[Hashable, tuple[int, int]] = {}
 
     for successor in __cfg_successors(graph, vertex, condition_vertices):
         (
@@ -170,12 +170,19 @@ def __cfg_node_depth(
 
         # Decrease the y positions of the already placed vertices if we found that the
         # height of the successors would go beyond the current height
-        successors_done_override_in_coords = tuple(
-            y for vertex, y in successors_done_override.items() if vertex in coords
+        max_successors_done_override_in_coords = max(
+            (
+                coord_y
+                for coord_vertex, coord_y in successors_done_override.items()
+                if coord_vertex in coords
+            ),
+            default=None,
         )
 
-        if successors_done_override_in_coords:
-            current_height = max(successors_done_override_in_coords, default=0) - y
+        if max_successors_done_override_in_coords is not None:
+            current_height = max_successors_done_override_in_coords - y
+        elif vertex in successors_done_override:
+            current_height = 0
         else:
             current_height = all_successors_height
 
@@ -224,13 +231,25 @@ def __cfg_node_depth(
 
         # Decrease the x positions of the already placed vertices if there is some
         # space next to the successors
-        max_width_next_to_successors = VERTEX_WIDTH + max(
+        min_coord_y = y + current_height
+
+        max_width_next_to_successors = max(
             (
-                coord_x - x
-                for coord_x, coord_y in coords.values()
-                if y < coord_y and coord_y < y_done_override
+                *(
+                    coord_x - (x - VERTEX_WIDTH)
+                    for coord_x, coord_y in coords.values()
+                    if y < coord_y and coord_y < min_coord_y
+                ),
+                *(
+                    coord_x + (loop_width - VERTEX_WIDTH) - (x - VERTEX_WIDTH)
+                    for coord_x, coord_y, loop_width in (
+                        (*coords[coord_vertex], loop_width)
+                        for coord_vertex, (loop_width, _) in loops.items()
+                    )
+                    if y < coord_y and coord_y < min_coord_y
+                ),
             ),
-            default=0,
+            default=all_successors_width,
         )
 
         width_difference = all_successors_width - max_width_next_to_successors
@@ -254,7 +273,8 @@ def __cfg_node_depth(
             if vertex_done_override != vertex:
                 continue
 
-            all_successors_height += VERTEX_HEIGHT
+            if successors_loops:
+                all_successors_width += VERTEX_WIDTH
 
             for coord_vertex, (coord_x, coord_y) in coords.items():
                 coords[coord_vertex] = (coord_x, coord_y + VERTEX_HEIGHT)
@@ -262,11 +282,14 @@ def __cfg_node_depth(
             for coord_vertex, coord_y in done_override.items():
                 done_override[coord_vertex] = coord_y + VERTEX_HEIGHT
 
-            loops[vertex] = max(
-                VERTEX_WIDTH,
-                all_successors_width,
-                loops.get(vertex, 0),
+            loop_width, loop_height = loops.get(vertex, (0, 0))
+
+            loops[vertex] = (
+                max(VERTEX_WIDTH, all_successors_width, loop_width),
+                max(VERTEX_HEIGHT + successors_height, loop_height),
             )
+
+            all_successors_height += VERTEX_HEIGHT
 
         # Update the coords and loops with the successors coords and loops
         coords.update(successors_coords)
@@ -364,9 +387,13 @@ def cfg_layout(
                     )
                 )
             elif end_y > start_y:
-                bottom_elbow_y = node_start_y - 0.25 * vertices_y_scale / scale_y
+                loop_width, loop_height = loops[end]
+
+                bottom_elbow_y = (
+                    node_end_y - (loop_height - 0.25) * vertices_y_scale / scale_y
+                )
                 right_elbow_x = (
-                    node_end_x + (loops[end] - 0.5) * vertices_x_scale / scale_x
+                    node_end_x + (loop_width - 0.5) * vertices_x_scale / scale_x
                 )
                 top_elbow_y = node_end_y + 0.25 * vertices_y_scale / scale_y
                 path.extend(
