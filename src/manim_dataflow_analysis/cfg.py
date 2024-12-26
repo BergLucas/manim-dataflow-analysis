@@ -256,7 +256,7 @@ def __cfg_node_depth(
 
         if width_difference > 0:
             for coord_vertex, (coord_x, coord_y) in successors_coords.items():
-                if coord_y <= y or y_done_override <= coord_y:
+                if coord_y <= y or min_coord_y <= coord_y:
                     continue
 
                 successors_coords[coord_vertex] = (
@@ -276,12 +276,6 @@ def __cfg_node_depth(
             if successors_loops:
                 all_successors_width += VERTEX_WIDTH
 
-            for coord_vertex, (coord_x, coord_y) in coords.items():
-                coords[coord_vertex] = (coord_x, coord_y + VERTEX_HEIGHT)
-
-            for coord_vertex, coord_y in done_override.items():
-                done_override[coord_vertex] = coord_y + VERTEX_HEIGHT
-
             loop_width, loop_height = loops.get(vertex, (0, 0))
 
             loops[vertex] = (
@@ -289,7 +283,8 @@ def __cfg_node_depth(
                 max(VERTEX_HEIGHT + successors_height, loop_height),
             )
 
-            all_successors_height += VERTEX_HEIGHT
+            if not coords:
+                all_successors_height += VERTEX_HEIGHT
 
         # Update the coords and loops with the successors coords and loops
         coords.update(successors_coords)
