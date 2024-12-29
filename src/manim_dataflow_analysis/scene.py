@@ -10,6 +10,8 @@ from typing import (
     Hashable,
     Iterable,
     TypeVar,
+    Set,
+    Mapping,
 )
 
 from frozendict import frozendict
@@ -29,19 +31,26 @@ from manim_dataflow_analysis.abstract_environment import (
     AbstractEnvironment,
     AbstractEnvironmentUpdateInstances,
 )
-from manim_dataflow_analysis.cfg import ControlFlowGraph, ProgramPoint, cond, succ
+from manim_dataflow_analysis.cfg import ControlFlowGraph, ProgramPoint
 from manim_dataflow_analysis.lattice import (
     Lattice,
     LatticeGraph,
     default_sorting_function,
 )
-from manim_dataflow_analysis.worklist import ResTable, WorklistTable, WorklistTex
+from manim_dataflow_analysis.worklist import (
+    ResTable,
+    WorklistTable,
+    WorklistTex,
+    WorklistListener,
+    worklist_algorithm,
+)
 from manim_dataflow_analysis.scale import fh, fw, scale_mobject
 
 if TYPE_CHECKING:
     import networkx as nx
     from manim.animation.animation import Animation
     from manim.mobject.types.vectorized_mobject import VMobject
+    from manim.mobject.text.tex_mobject import SingleStringMathTex, Tex
 
     from manim_dataflow_analysis.ast import AstFunction, AstStatement
     from manim_dataflow_analysis.condition_update_function import (
@@ -770,309 +779,369 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         else:
             raise NotImplementedError("Unsupported camera type")
 
-    def worklist(
+    def create_worklist_listener(
         self,
-        entry_point: ProgramPoint,
-        program_cfg: nx.DiGraph[ProgramPoint],
-        cfg: ControlFlowGraph,
         lattice_graph: LatticeGraph[L],
+        cfg: ControlFlowGraph,
         control_flow_function_tex: AbstractEnvironmentUpdateInstances,
         flow_function_tex: AbstractEnvironmentUpdateInstances | None,
         condition_update_function_tex: AbstractEnvironmentUpdateInstances,
-    ):
-        abstract_environments = {
-            p: AbstractEnvironment(
-                self.lattice,
-                frozendict(
-                    (
-                        *(
-                            (variable, self.lattice.bottom())
-                            for variable in self.program.variables
-                        ),
-                        *(
-                            (parameter, self.lattice.top())
-                            for parameter in self.program.parameters
-                        ),
-                    )
-                ),
-            )
-            for p in program_cfg.nodes
-        }
+    ) -> WorklistListener[L, E]:
+        class WorklistAnimation:
 
-        variables = self.program.variables.union(self.program.parameters)
-
-        worklist = {entry_point}
-
-        table = self.create_worklist_table(variables, abstract_environments)
-
-        res_table = self.create_res_table(variables)
-
-        worklist_tex = self.create_worklist_tex(worklist)
-
-        self.play(Create(table), Create(res_table), Create(worklist_tex))
-
-        while worklist:
-            program_point = worklist.pop()
-
-            worklist_pop_title = Text(
-                self.worklist_pop_title_template.format(
-                    program_point=str(program_point.point)
-                )
-            )
-            scale_mobject(
-                worklist_pop_title,
-                self.cfg_title_width,
-                self.cfg_title_height,
-            )
-            worklist_pop_title.move_to(self.cfg_title_position)
-
-            worklist_program_point_rectangle = SurroundingRectangle(
-                worklist_tex.get_program_point_part(program_point)
-            )
-
-            self.play(
-                Create(worklist_pop_title),
-                Create(worklist_program_point_rectangle),
-            )
-
-            table_program_point_rectangle = None
-            program_point_rectangle = None
-
-            with (
-                self.animate_mobject(
-                    worklist_tex,
-                    self.create_worklist_tex(worklist),
-                ) as (
-                    worklist_animation,
-                    worklist_tex,
-                ),
-                self.animate_mobject(
-                    program_point_rectangle,
-                    SurroundingRectangle(cfg[program_point]),
-                ) as (
-                    program_point_animation,
-                    program_point_rectangle,
-                ),
-                self.animate_mobject(
-                    table_program_point_rectangle,
-                    SurroundingRectangle(table.get_program_point_part(program_point)),
-                ) as (
-                    table_program_point_animation,
-                    table_program_point_rectangle,
-                ),
+            @classmethod
+            def before_worklist_creation(
+                cls,
+                variables: Set[str],
+                abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
             ):
+                pass
+
+            table: WorklistTable[L]
+            res_table: ResTable[L]
+            worklist_tex: WorklistTex
+
+            @classmethod
+            def after_worklist_creation(
+                cls,
+                variables: Set[str],
+                abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
+                worklist: Set[ProgramPoint],
+            ):
+                cls.table = self.create_worklist_table(variables, abstract_environments)
+
+                cls.res_table = self.create_res_table(variables)
+
+                cls.worklist_tex = self.create_worklist_tex(worklist)
+
                 self.play(
-                    Uncreate(worklist_program_point_rectangle),
-                    worklist_animation,
-                    program_point_animation,
-                    table_program_point_animation,
+                    Create(cls.table), Create(cls.res_table), Create(cls.worklist_tex)
                 )
 
-            self.wait(self.worklist_pop_wait_time)
+            @classmethod
+            def before_iteration(
+                cls,
+                variables: Set[str],
+                abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
+                worklist: Set[ProgramPoint],
+            ):
+                pass
 
-            (
-                res,
-                res_variables,
-                res_instance_id,
-            ) = self.control_flow_function.apply_and_get_variables(
-                program_point, abstract_environments[program_point]
-            )
+            worklist_pop_title: Text
+            worklist_program_point_rectangle: SurroundingRectangle
+            table_program_point_rectangle: SurroundingRectangle | None
+            program_point_rectangle: SurroundingRectangle | None
 
-            if isinstance(res_instance_id, int):
-                control_flow_function_instance = (
-                    control_flow_function_tex.get_instance_part(res_instance_id)
+            @classmethod
+            def after_program_point_selection(
+                cls,
+                program_point: ProgramPoint,
+                variables: Set[str],
+                abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
+                worklist: Set[ProgramPoint],
+            ):
+                cls.worklist_pop_title = Text(
+                    self.worklist_pop_title_template.format(
+                        program_point=str(program_point.point)
+                    )
                 )
-                control_flow_function_result = (
-                    control_flow_function_tex.get_modification_part(res_instance_id)
+                scale_mobject(
+                    cls.worklist_pop_title,
+                    self.cfg_title_width,
+                    self.cfg_title_height,
                 )
-            else:
-                instance_id, flow_instance_id = res_instance_id
-                control_flow_function_instance = (
-                    control_flow_function_tex.get_instance_part(instance_id)
-                )
-                assert flow_function_tex is not None
-                control_flow_function_result = flow_function_tex.get_modification_part(
-                    flow_instance_id
+                cls.worklist_pop_title.move_to(self.cfg_title_position)
+
+                cls.worklist_program_point_rectangle = SurroundingRectangle(
+                    cls.worklist_tex.get_program_point_part(program_point)
                 )
 
-            program_point_label = cfg.labels[program_point].copy()
-            program_point_label.color = WHITE
-
-            self.add(control_flow_function_tex, flow_function_tex)
-
-            self.play(
-                Uncreate(worklist_pop_title),
-                Transform(program_point_label, control_flow_function_instance),
-                self.move_camera_animation(self.control_flow_function_camera_position),
-            )
-            self.remove(program_point_label)
-
-            self.show_control_flow_function_instance(
-                control_flow_function_tex,
-                flow_function_tex,
-                res_instance_id,
-                program_point,
-            )
-
-            worklist_control_flow_variables_title = Text(
-                self.worklist_control_flow_variables_title_template.format(
-                    variables=", ".join(variable for variable in res_variables)
+                self.play(
+                    Create(cls.worklist_pop_title),
+                    Create(cls.worklist_program_point_rectangle),
                 )
-            )
-            scale_mobject(
-                worklist_control_flow_variables_title,
-                self.cfg_title_width,
-                self.cfg_title_height,
-            )
-            worklist_control_flow_variables_title.move_to(self.cfg_title_position)
 
-            with (
-                self.animate_mobject(
-                    res_table,
-                    self.create_res_table(
-                        variables,
-                        AbstractEnvironment(self.lattice, frozendict(res_variables)),
+                cls.table_program_point_rectangle = None
+                cls.program_point_rectangle = None
+
+                with (
+                    self.animate_mobject(
+                        cls.worklist_tex,
+                        self.create_worklist_tex(worklist),
+                    ) as (
+                        worklist_animation,
+                        cls.worklist_tex,
                     ),
-                ) as (res_table_animation, res_table),
-            ):
-                res_parts = tuple(
-                    (
-                        control_flow_function_result.copy(),
-                        res_table.get_res_variable_part(variable),
+                    self.animate_mobject(
+                        cls.program_point_rectangle,
+                        SurroundingRectangle(cfg[program_point]),
+                    ) as (
+                        cls.program_point_animation,
+                        cls.program_point_rectangle,
+                    ),
+                    self.animate_mobject(
+                        cls.table_program_point_rectangle,
+                        SurroundingRectangle(
+                            cls.table.get_program_point_part(program_point)
+                        ),
+                    ) as (
+                        cls.table_program_point_animation,
+                        cls.table_program_point_rectangle,
+                    ),
+                ):
+                    self.play(
+                        Uncreate(cls.worklist_program_point_rectangle),
+                        worklist_animation,
+                        cls.program_point_animation,
+                        cls.table_program_point_animation,
                     )
-                    for variable in res_variables
-                )
+
+                self.wait(self.worklist_pop_wait_time)
+
+            control_flow_function_instance: VMobject
+            control_flow_function_result: VMobject
+            program_point_label: SingleStringMathTex | Text | Tex
+            worklist_control_flow_variables_title: Text
+            res_table: ResTable[L]
+            worklist_table_variables_title: Text
+            table_successor_program_point_rectangle: SurroundingRectangle | None
+            successor_program_point_rectangle: SurroundingRectangle | None
+
+            @classmethod
+            def after_control_flow_function_application(
+                cls,
+                program_point: ProgramPoint,
+                variables: Set[str],
+                abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
+                worklist: Set[ProgramPoint],
+                res: AbstractEnvironment[L],
+                res_variables: Mapping[str, L],
+                res_instance_id: int,
+            ):
+                if isinstance(res_instance_id, int):
+                    cls.control_flow_function_instance = (
+                        control_flow_function_tex.get_instance_part(res_instance_id)
+                    )
+                    cls.control_flow_function_result = (
+                        control_flow_function_tex.get_modification_part(res_instance_id)
+                    )
+                else:
+                    instance_id, flow_instance_id = res_instance_id
+                    cls.control_flow_function_instance = (
+                        control_flow_function_tex.get_instance_part(instance_id)
+                    )
+                    assert flow_function_tex is not None
+                    cls.control_flow_function_result = (
+                        flow_function_tex.get_modification_part(flow_instance_id)
+                    )
+
+                cls.program_point_label = cfg.labels[program_point].copy()
+                cls.program_point_label.color = WHITE
+
+                self.add(control_flow_function_tex, flow_function_tex)
+
                 self.play(
-                    Create(worklist_control_flow_variables_title),
-                    self.move_camera_animation(self.worklist_camera_position),
-                    res_table_animation,
-                    *(Transform(*res_part) for res_part in res_parts),
+                    Uncreate(cls.worklist_pop_title),
+                    Transform(
+                        cls.program_point_label, cls.control_flow_function_instance
+                    ),
+                    self.move_camera_animation(
+                        self.control_flow_function_camera_position
+                    ),
                 )
-                self.remove(
+                self.remove(cls.program_point_label)
+
+                self.show_control_flow_function_instance(
                     control_flow_function_tex,
                     flow_function_tex,
-                    *(part for part, _ in res_parts),
+                    res_instance_id,
+                    program_point,
                 )
 
-            self.wait(self.worklist_control_flow_variables_wait_time)
+                cls.worklist_control_flow_variables_title = Text(
+                    self.worklist_control_flow_variables_title_template.format(
+                        variables=", ".join(variable for variable in res_variables)
+                    )
+                )
+                scale_mobject(
+                    cls.worklist_control_flow_variables_title,
+                    self.cfg_title_width,
+                    self.cfg_title_height,
+                )
+                cls.worklist_control_flow_variables_title.move_to(
+                    self.cfg_title_position
+                )
 
-            worklist_table_variables_title = Text(
-                self.worklist_table_variables_title_template.format(
-                    program_point=str(program_point.point),
-                    variables=", ".join(
-                        variable
+                with (
+                    self.animate_mobject(
+                        cls.res_table,
+                        self.create_res_table(
+                            variables,
+                            AbstractEnvironment(
+                                self.lattice, frozendict(res_variables)
+                            ),
+                        ),
+                    ) as (res_table_animation, cls.res_table),
+                ):
+                    res_parts = tuple(
+                        (
+                            cls.control_flow_function_result.copy(),
+                            cls.res_table.get_res_variable_part(variable),
+                        )
+                        for variable in res_variables
+                    )
+                    self.play(
+                        Create(cls.worklist_control_flow_variables_title),
+                        self.move_camera_animation(self.worklist_camera_position),
+                        res_table_animation,
+                        *(Transform(*res_part) for res_part in res_parts),
+                    )
+                    self.remove(
+                        control_flow_function_tex,
+                        flow_function_tex,
+                        *(part for part, _ in res_parts),
+                    )
+
+                self.wait(self.worklist_control_flow_variables_wait_time)
+
+                cls.worklist_table_variables_title = Text(
+                    self.worklist_table_variables_title_template.format(
+                        program_point=str(program_point.point),
+                        variables=", ".join(
+                            variable
+                            for variable in variables
+                            if variable not in res_variables
+                        ),
+                    )
+                )
+                scale_mobject(
+                    cls.worklist_table_variables_title,
+                    self.cfg_title_width,
+                    self.cfg_title_height,
+                )
+                cls.worklist_table_variables_title.move_to(self.cfg_title_position)
+
+                with (
+                    self.animate_mobject(
+                        cls.res_table,
+                        self.create_res_table(variables, res),
+                    ) as (res_table_animation, cls.res_table),
+                ):
+                    control_flow_parts = tuple(
+                        (
+                            cls.table.get_variable_part(program_point, variable).copy(),
+                            cls.res_table.get_res_variable_part(variable),
+                        )
                         for variable in variables
                         if variable not in res_variables
-                    ),
-                )
-            )
-            scale_mobject(
-                worklist_table_variables_title,
-                self.cfg_title_width,
-                self.cfg_title_height,
-            )
-            worklist_table_variables_title.move_to(self.cfg_title_position)
-
-            with (
-                self.animate_mobject(
-                    res_table,
-                    self.create_res_table(variables, res),
-                ) as (res_table_animation, res_table),
-            ):
-                control_flow_parts = tuple(
-                    (
-                        table.get_variable_part(program_point, variable).copy(),
-                        res_table.get_res_variable_part(variable),
                     )
-                    for variable in variables
-                    if variable not in res_variables
-                )
-                self.play(
-                    Transform(
-                        worklist_control_flow_variables_title,
-                        worklist_table_variables_title,
-                    ),
-                    res_table_animation,
-                    *(
-                        Transform(*control_flow_part)
-                        for control_flow_part in control_flow_parts
-                    ),
-                )
-                self.remove(*(part for part, _ in control_flow_parts))
+                    self.play(
+                        Transform(
+                            cls.worklist_control_flow_variables_title,
+                            cls.worklist_table_variables_title,
+                        ),
+                        res_table_animation,
+                        *(
+                            Transform(*control_flow_part)
+                            for control_flow_part in control_flow_parts
+                        ),
+                    )
+                    self.remove(*(part for part, _ in control_flow_parts))
 
-            self.add(worklist_table_variables_title)
-            self.remove(worklist_control_flow_variables_title)
+                self.add(cls.worklist_table_variables_title)
+                self.remove(cls.worklist_control_flow_variables_title)
 
-            self.wait(self.worklist_table_variables_wait_time)
+                self.wait(self.worklist_table_variables_wait_time)
 
-            self.play(Uncreate(worklist_table_variables_title))
+                self.play(Uncreate(cls.worklist_table_variables_title))
 
-            table_successor_program_point_rectangle = None
-            successor_program_point_rectangle = None
+                cls.table_successor_program_point_rectangle = None
+                cls.successor_program_point_rectangle = None
 
-            for successor in succ(program_cfg, program_point):
-                worklist_successor_title = Text(
+            worklist_successor_title: Text
+
+            @classmethod
+            def before_successor_iteration(
+                cls,
+                program_point: ProgramPoint,
+                variables: Set[str],
+                abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
+                worklist: Set[ProgramPoint],
+                successor: ProgramPoint,
+            ):
+                cls.worklist_successor_title = Text(
                     self.worklist_successor_title_template.format(
                         successor_program_point=str(successor.point),
                     )
                 )
                 scale_mobject(
-                    worklist_successor_title,
+                    cls.worklist_successor_title,
                     self.cfg_title_width,
                     self.cfg_title_height,
                 )
-                worklist_successor_title.move_to(self.cfg_title_position)
+                cls.worklist_successor_title.move_to(self.cfg_title_position)
 
                 with (
                     self.animate_mobject(
-                        successor_program_point_rectangle,
+                        cls.successor_program_point_rectangle,
                         SurroundingRectangle(cfg[successor], color=ORANGE),
                     ) as (
                         successor_program_point_animation,
-                        successor_program_point_rectangle,
+                        cls.successor_program_point_rectangle,
                     ),
                     self.animate_mobject(
-                        table_successor_program_point_rectangle,
+                        cls.table_successor_program_point_rectangle,
                         SurroundingRectangle(
-                            table.get_program_point_part(successor), color=ORANGE
+                            cls.table.get_program_point_part(successor), color=ORANGE
                         ),
                     ) as (
                         table_successor_program_point_animation,
-                        table_successor_program_point_rectangle,
+                        cls.table_successor_program_point_rectangle,
                     ),
                 ):
                     self.play(
-                        Create(worklist_successor_title),
+                        Create(cls.worklist_successor_title),
                         successor_program_point_animation,
                         table_successor_program_point_animation,
                     )
 
                 self.wait(self.worklist_successor_wait_time)
 
-                self.play(Uncreate(worklist_successor_title))
+                self.play(Uncreate(cls.worklist_successor_title))
 
-                condition: E = cond(program_cfg, program_point, successor)
+            successor_program_point_label: SingleStringMathTex | Text | Tex
+            condition_update_function_instance: VMobject
+            condition_update_function_result: VMobject
+            worklist_condition_update_variables_title: Text
+            worklist_res_variables_title: Text
 
-                (
-                    res_cond,
-                    res_cond_variables,
-                    res_cond_instance_id,
-                ) = self.condition_update_function.apply_and_get_variables(
-                    condition,
-                    res,
-                )
+            @classmethod
+            def after_condition_update_function_application(
+                cls,
+                program_point: ProgramPoint,
+                variables: Set[str],
+                abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
+                worklist: Set[ProgramPoint],
+                res: AbstractEnvironment[L],
+                res_variables: Mapping[str, L],
+                res_instance_id: int,
+                successor: ProgramPoint,
+                condition: E,
+                res_cond: AbstractEnvironment[L] | None,
+                res_cond_variables: Mapping[str, L] | None,
+                res_cond_instance_id: int,
+            ):
+                cls.program_point_label = cfg.labels[program_point].copy()
+                cls.program_point_label.color = WHITE
+                cls.successor_program_point_label = cfg.labels[successor].copy()
+                cls.successor_program_point_label.color = WHITE
 
-                program_point_label = cfg.labels[program_point].copy()
-                program_point_label.color = WHITE
-                successor_program_point_label = cfg.labels[successor].copy()
-                successor_program_point_label.color = WHITE
-
-                condition_update_function_instance = (
+                cls.condition_update_function_instance = (
                     condition_update_function_tex.get_instance_part(
                         res_cond_instance_id
                     )
                 )
-                condition_update_function_result = (
+                cls.condition_update_function_result = (
                     condition_update_function_tex.get_modification_part(
                         res_cond_instance_id
                     )
@@ -1081,16 +1150,18 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                 self.add(condition_update_function_tex)
 
                 self.play(
-                    Transform(program_point_label, condition_update_function_instance),
                     Transform(
-                        successor_program_point_label,
-                        condition_update_function_instance,
+                        cls.program_point_label, cls.condition_update_function_instance
+                    ),
+                    Transform(
+                        cls.successor_program_point_label,
+                        cls.condition_update_function_instance,
                     ),
                     self.move_camera_animation(
                         self.condition_update_function_camera_position
                     ),
                 )
-                self.remove(program_point_label, successor_program_point_label)
+                self.remove(cls.program_point_label, cls.successor_program_point_label)
 
                 self.show_condition_update_function_instance(
                     condition_update_function_tex,
@@ -1098,23 +1169,23 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     condition,
                 )
 
-                worklist_condition_update_variables_title = Text(
+                cls.worklist_condition_update_variables_title = Text(
                     self.worklist_condition_update_variables_title_template.format(
                         variables=", ".join(variable for variable in res_cond_variables)
                     )
                 )
                 scale_mobject(
-                    worklist_condition_update_variables_title,
+                    cls.worklist_condition_update_variables_title,
                     self.cfg_title_width,
                     self.cfg_title_height,
                 )
-                worklist_condition_update_variables_title.move_to(
+                cls.worklist_condition_update_variables_title.move_to(
                     self.cfg_title_position
                 )
 
                 with (
                     self.animate_mobject(
-                        res_table,
+                        cls.res_table,
                         self.create_res_table(
                             variables,
                             res,
@@ -1122,17 +1193,17 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                                 self.lattice, frozendict(res_cond_variables)
                             ),
                         ),
-                    ) as (res_cond_table_animation, res_table),
+                    ) as (res_cond_table_animation, cls.res_table),
                 ):
                     res_cond_parts = tuple(
                         (
-                            condition_update_function_result.copy(),
-                            res_table.get_res_cond_variable_part(variable),
+                            cls.condition_update_function_result.copy(),
+                            cls.res_table.get_res_cond_variable_part(variable),
                         )
                         for variable in res_cond_variables
                     )
                     self.play(
-                        Create(worklist_condition_update_variables_title),
+                        Create(cls.worklist_condition_update_variables_title),
                         self.move_camera_animation(self.worklist_camera_position),
                         res_cond_table_animation,
                         *(
@@ -1146,7 +1217,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
                 self.wait(self.worklist_condition_update_variables_wait_time)
 
-                worklist_res_variables_title = Text(
+                cls.worklist_res_variables_title = Text(
                     self.worklist_res_variables_title_template.format(
                         variables=", ".join(
                             variable
@@ -1156,30 +1227,30 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     )
                 )
                 scale_mobject(
-                    worklist_res_variables_title,
+                    cls.worklist_res_variables_title,
                     self.cfg_title_width,
                     self.cfg_title_height,
                 )
-                worklist_res_variables_title.move_to(self.cfg_title_position)
+                cls.worklist_res_variables_title.move_to(self.cfg_title_position)
 
                 with (
                     self.animate_mobject(
-                        res_table,
+                        cls.res_table,
                         self.create_res_table(variables, res, res_cond),
-                    ) as (res_cond_table_animation, res_table),
+                    ) as (res_cond_table_animation, cls.res_table),
                 ):
                     condition_update_parts = tuple(
                         (
-                            res_table.get_res_variable_part(variable).copy(),
-                            res_table.get_res_cond_variable_part(variable),
+                            cls.res_table.get_res_variable_part(variable).copy(),
+                            cls.res_table.get_res_cond_variable_part(variable),
                         )
                         for variable in variables
                         if variable not in res_cond_variables
                     )
                     self.play(
                         Transform(
-                            worklist_condition_update_variables_title,
-                            worklist_res_variables_title,
+                            cls.worklist_condition_update_variables_title,
+                            cls.worklist_res_variables_title,
                         ),
                         res_cond_table_animation,
                         *(
@@ -1189,258 +1260,395 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     )
                     self.remove(*(part for part, _ in condition_update_parts))
 
-                self.add(worklist_res_variables_title)
-                self.remove(worklist_condition_update_variables_title)
+                self.add(cls.worklist_res_variables_title)
+                self.remove(cls.worklist_condition_update_variables_title)
 
                 self.wait(self.worklist_res_variables_wait_time)
 
-                self.play(Uncreate(worklist_res_variables_title))
+                self.play(Uncreate(cls.worklist_res_variables_title))
 
-                included = abstract_environments[successor].includes(res_cond)
+            worklist_included_title: Text
 
+            @classmethod
+            def after_included(
+                cls,
+                program_point: ProgramPoint,
+                variables: Set[str],
+                abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
+                worklist: Set[ProgramPoint],
+                res: AbstractEnvironment[L],
+                res_variables: Mapping[str, L],
+                res_instance_id: int,
+                successor: ProgramPoint,
+                condition: E,
+                res_cond: AbstractEnvironment[L] | None,
+                res_cond_variables: Mapping[str, L] | None,
+                res_cond_instance_id: int,
+                included: bool,
+            ):
                 if included:
-                    worklist_included_title = Text(
+                    cls.worklist_included_title = Text(
                         self.worklist_is_included_title_template.format(
                             successor_program_point=str(successor.point)
                         )
                     )
                 else:
-                    worklist_included_title = Text(
+                    cls.worklist_included_title = Text(
                         self.worklist_not_included_title_template.format(
                             successor_program_point=str(successor.point),
                         )
                     )
                 scale_mobject(
-                    worklist_included_title,
+                    cls.worklist_included_title,
                     self.cfg_title_width,
                     self.cfg_title_height,
                 )
-                worklist_included_title.move_to(self.cfg_title_position)
+                cls.worklist_included_title.move_to(self.cfg_title_position)
 
-                self.play(Create(worklist_included_title))
+                self.play(Create(cls.worklist_included_title))
 
                 self.wait(self.worklist_included_wait_time)
 
-                self.play(Uncreate(worklist_included_title))
+                self.play(Uncreate(cls.worklist_included_title))
 
-                if not included:
-                    worklist_joined_values_title = Text(
-                        self.worklist_joined_values_title_template.format(
-                            program_point=str(successor.point)
-                        )
+            @classmethod
+            def after_not_included(
+                cls,
+                program_point: ProgramPoint,
+                variables: Set[str],
+                abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
+                worklist: Set[ProgramPoint],
+                res: AbstractEnvironment[L],
+                res_variables: Mapping[str, L],
+                res_instance_id: int,
+                successor: ProgramPoint,
+                condition: E,
+                res_cond: AbstractEnvironment[L] | None,
+                res_cond_variables: Mapping[str, L] | None,
+                res_cond_instance_id: int,
+            ):
+                cls.worklist_joined_values_title = Text(
+                    self.worklist_joined_values_title_template.format(
+                        program_point=str(successor.point)
                     )
-                    scale_mobject(
-                        worklist_joined_values_title,
-                        self.cfg_title_width,
-                        self.cfg_title_height,
+                )
+                scale_mobject(
+                    cls.worklist_joined_values_title,
+                    self.cfg_title_width,
+                    self.cfg_title_height,
+                )
+                cls.worklist_joined_values_title.move_to(self.cfg_title_position)
+
+                self.play(Create(cls.worklist_joined_values_title))
+
+                self.wait(self.worklist_joined_values_wait_time)
+
+            new_lattice_graph: LatticeGraph[L]
+            successor_program_point_part: VMobject
+            res_cond_part: VMobject
+            lattice_res_cond_part: VMobject
+            lattice_successor_part: VMobject
+            lattice_join_title: Text
+            lattice_joined_part: VMobject
+
+            @classmethod
+            def while_join(
+                cls,
+                program_point: ProgramPoint,
+                variables: Set[str],
+                abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
+                worklist: Set[ProgramPoint],
+                res: AbstractEnvironment[L],
+                res_variables: Mapping[str, L],
+                res_instance_id: int,
+                successor: ProgramPoint,
+                condition: E,
+                res_cond: AbstractEnvironment[L] | None,
+                res_cond_variables: Mapping[str, L] | None,
+                res_cond_instance_id: int,
+                variable: str,
+                joined_abstract_value: L,
+                current_abstract_value: L,
+                successor_abstract_value: L,
+            ):
+                cls.new_lattice_graph = self.create_lattice_graph(
+                    {
+                        current_abstract_value,
+                        successor_abstract_value,
+                        joined_abstract_value,
+                    }
+                )
+
+                self.add(lattice_graph)
+                self.play(FadeTransform(lattice_graph, cls.new_lattice_graph))
+
+                cls.new_lattice_graph.color_path(
+                    current_abstract_value, joined_abstract_value
+                )
+                cls.new_lattice_graph.color_path(
+                    successor_abstract_value, joined_abstract_value
+                )
+
+                self.add(cls.new_lattice_graph)
+                self.remove(lattice_graph)
+
+                cls.successor_program_point_part = cls.table.get_variable_part(
+                    successor, variable
+                ).copy()
+                cls.res_cond_part = cls.res_table.get_res_cond_variable_part(
+                    variable
+                ).copy()
+
+                cls.lattice_res_cond_part = cls.new_lattice_graph.labels[
+                    current_abstract_value
+                ]
+                cls.lattice_successor_part = cls.new_lattice_graph.labels[
+                    successor_abstract_value
+                ]
+
+                cls.lattice_join_title = Text(
+                    self.lattice_join_title_template.format(
+                        abstract_value1=current_abstract_value,
+                        abstract_value2=successor_abstract_value,
+                        joined_abstract_value=joined_abstract_value,
                     )
-                    worklist_joined_values_title.move_to(self.cfg_title_position)
+                )
+                scale_mobject(
+                    cls.lattice_join_title,
+                    self.lattice_title_width,
+                    self.lattice_title_height,
+                )
+                cls.lattice_join_title.move_to(self.lattice_title_position)
 
-                    self.play(Create(worklist_joined_values_title))
+                self.play(
+                    Create(cls.lattice_join_title),
+                    Transform(
+                        cls.successor_program_point_part, cls.lattice_successor_part
+                    ),
+                    Transform(cls.res_cond_part, cls.lattice_res_cond_part),
+                    self.move_camera_animation(self.lattice_camera_position),
+                )
 
-                    self.wait(self.worklist_joined_values_wait_time)
+                self.remove(cls.successor_program_point_part, cls.res_cond_part)
 
-                    for variable, joined_abstract_value in abstract_environments[
-                        successor
-                    ].join_generator(res_cond):
-                        current_abstract_value = res_cond[variable]
-                        successor_abstract_value = abstract_environments[successor][
-                            variable
-                        ]
+                self.wait(self.lattice_join_wait_time)
 
-                        abstract_environments[successor] = abstract_environments[
-                            successor
-                        ].set({variable: joined_abstract_value})
-
-                        new_lattice_graph = self.create_lattice_graph(
-                            {
-                                current_abstract_value,
-                                successor_abstract_value,
-                                joined_abstract_value,
-                            }
-                        )
-
-                        self.add(lattice_graph)
-                        self.play(FadeTransform(lattice_graph, new_lattice_graph))
-
-                        new_lattice_graph.color_path(
-                            current_abstract_value, joined_abstract_value
-                        )
-                        new_lattice_graph.color_path(
-                            successor_abstract_value, joined_abstract_value
-                        )
-
-                        self.add(new_lattice_graph)
-                        self.remove(lattice_graph)
-
-                        successor_program_point_part = table.get_variable_part(
-                            successor, variable
-                        ).copy()
-                        res_cond_part = res_table.get_res_cond_variable_part(
-                            variable
-                        ).copy()
-
-                        lattice_res_cond_part = new_lattice_graph.labels[
-                            current_abstract_value
-                        ]
-                        lattice_successor_part = new_lattice_graph.labels[
-                            successor_abstract_value
-                        ]
-
-                        lattice_join_title = Text(
-                            self.lattice_join_title_template.format(
-                                abstract_value1=current_abstract_value,
-                                abstract_value2=successor_abstract_value,
-                                joined_abstract_value=joined_abstract_value,
-                            )
-                        )
-                        scale_mobject(
-                            lattice_join_title,
-                            self.lattice_title_width,
-                            self.lattice_title_height,
-                        )
-                        lattice_join_title.move_to(self.lattice_title_position)
-
-                        self.play(
-                            Create(lattice_join_title),
-                            Transform(
-                                successor_program_point_part, lattice_successor_part
-                            ),
-                            Transform(res_cond_part, lattice_res_cond_part),
-                            self.move_camera_animation(self.lattice_camera_position),
-                        )
-
-                        self.remove(successor_program_point_part, res_cond_part)
-
-                        self.wait(self.lattice_join_wait_time)
-
-                        lattice_joined_part = new_lattice_graph.labels[
-                            joined_abstract_value
-                        ].copy()
-
-                        with (
-                            self.animate_mobject(
-                                table,
-                                self.create_worklist_table(
-                                    variables, abstract_environments
-                                ),
-                            ) as (
-                                table_animation,
-                                table,
-                            ),
-                        ):
-                            self.play(
-                                Uncreate(lattice_join_title),
-                                Transform(
-                                    lattice_joined_part,
-                                    table.get_variable_part(successor, variable),
-                                ),
-                                self.move_camera_animation(
-                                    self.worklist_camera_position
-                                ),
-                                table_animation,
-                            )
-
-                        self.remove(lattice_joined_part, new_lattice_graph)
-
-                    self.play(Uncreate(worklist_joined_values_title))
-
-                    worklist.add(successor)
-
-                    worklist_add_successor_title = Text(
-                        self.worklist_add_successor_title_template.format(
-                            program_point=str(successor.point)
-                        )
-                    )
-                    scale_mobject(
-                        worklist_add_successor_title,
-                        self.cfg_title_width,
-                        self.cfg_title_height,
-                    )
-                    worklist_add_successor_title.move_to(self.cfg_title_position)
-
-                    with (
-                        self.animate_mobject(
-                            worklist_tex,
-                            self.create_worklist_tex(worklist),
-                        ) as (
-                            worklist_animation,
-                            worklist_tex,
-                        ),
-                    ):
-                        self.play(
-                            Create(worklist_add_successor_title),
-                            worklist_animation,
-                        )
-
-                    self.wait(self.worklist_add_successor_wait_time)
-
-                    self.play(Uncreate(worklist_add_successor_title))
+                cls.lattice_joined_part = cls.new_lattice_graph.labels[
+                    joined_abstract_value
+                ].copy()
 
                 with (
                     self.animate_mobject(
-                        res_table,
+                        cls.table,
+                        self.create_worklist_table(variables, abstract_environments),
+                    ) as (
+                        table_animation,
+                        cls.table,
+                    ),
+                ):
+                    self.play(
+                        Uncreate(cls.lattice_join_title),
+                        Transform(
+                            cls.lattice_joined_part,
+                            cls.table.get_variable_part(successor, variable),
+                        ),
+                        self.move_camera_animation(self.worklist_camera_position),
+                        table_animation,
+                    )
+
+                self.remove(cls.lattice_joined_part, cls.new_lattice_graph)
+
+            @classmethod
+            def after_join(
+                cls,
+                program_point: ProgramPoint,
+                variables: Set[str],
+                abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
+                worklist: Set[ProgramPoint],
+                res: AbstractEnvironment[L],
+                res_variables: Mapping[str, L],
+                res_instance_id: int,
+                successor: ProgramPoint,
+                condition: E,
+                res_cond: AbstractEnvironment[L] | None,
+                res_cond_variables: Mapping[str, L] | None,
+                res_cond_instance_id: int,
+            ):
+                self.play(Uncreate(cls.worklist_joined_values_title))
+
+            @classmethod
+            def after_add(
+                cls,
+                program_point: ProgramPoint,
+                variables: Set[str],
+                abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
+                worklist: Set[ProgramPoint],
+                res: AbstractEnvironment[L],
+                res_variables: Mapping[str, L],
+                res_instance_id: int,
+                successor: ProgramPoint,
+                condition: E,
+                res_cond: AbstractEnvironment[L] | None,
+                res_cond_variables: Mapping[str, L] | None,
+                res_cond_instance_id: int,
+            ):
+                cls.worklist_add_successor_title = Text(
+                    self.worklist_add_successor_title_template.format(
+                        program_point=str(successor.point)
+                    )
+                )
+                scale_mobject(
+                    cls.worklist_add_successor_title,
+                    self.cfg_title_width,
+                    self.cfg_title_height,
+                )
+                cls.worklist_add_successor_title.move_to(self.cfg_title_position)
+
+                with (
+                    self.animate_mobject(
+                        cls.worklist_tex,
+                        self.create_worklist_tex(worklist),
+                    ) as (
+                        worklist_animation,
+                        cls.worklist_tex,
+                    ),
+                ):
+                    self.play(
+                        Create(cls.worklist_add_successor_title),
+                        worklist_animation,
+                    )
+
+                self.wait(self.worklist_add_successor_wait_time)
+
+                self.play(Uncreate(cls.worklist_add_successor_title))
+
+            @classmethod
+            def after_successor_iteration(
+                cls,
+                program_point: ProgramPoint,
+                variables: Set[str],
+                abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
+                worklist: Set[ProgramPoint],
+                res: AbstractEnvironment[L],
+                res_variables: Mapping[str, L],
+                res_instance_id: int,
+                successor: ProgramPoint,
+                condition: E,
+                res_cond: AbstractEnvironment[L] | None,
+                res_cond_variables: Mapping[str, L] | None,
+                res_cond_instance_id: int,
+            ):
+                with (
+                    self.animate_mobject(
+                        cls.res_table,
                         self.create_res_table(variables, res),
                     ) as (
                         res_table_animation,
-                        res_table,
+                        cls.res_table,
                     ),
                 ):
                     self.play(res_table_animation)
 
-            with (
-                self.animate_mobject(
-                    res_table,
-                    self.create_res_table(variables),
-                ) as (
-                    res_table_animation,
-                    res_table,
-                ),
-                self.animate_mobject(
-                    program_point_rectangle,
-                    None,
-                ) as (
-                    program_point_animation,
-                    program_point_rectangle,
-                ),
-                self.animate_mobject(
-                    table_program_point_rectangle,
-                    None,
-                ) as (
-                    table_program_point_animation,
-                    table_program_point_rectangle,
-                ),
-                self.animate_mobject(
-                    successor_program_point_rectangle,
-                    None,
-                ) as (
-                    successor_program_point_animation,
-                    successor_program_point_rectangle,
-                ),
-                self.animate_mobject(
-                    table_successor_program_point_rectangle,
-                    None,
-                ) as (
-                    table_successor_program_point_animation,
-                    table_successor_program_point_rectangle,
-                ),
+            @classmethod
+            def after_iteration(
+                cls,
+                variables: Set[str],
+                abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
+                worklist: Set[ProgramPoint],
+                res: AbstractEnvironment[L],
+                res_variables: Mapping[str, L],
+                res_instance_id: int,
             ):
-                if (
-                    successor_program_point_animation is not None
-                    and table_successor_program_point_animation is not None
-                ):
-                    self.play(
+                with (
+                    self.animate_mobject(
+                        cls.res_table,
+                        self.create_res_table(variables),
+                    ) as (
+                        res_table_animation,
+                        cls.res_table,
+                    ),
+                    self.animate_mobject(
+                        cls.program_point_rectangle,
+                        None,
+                    ) as (
+                        program_point_animation,
+                        cls.program_point_rectangle,
+                    ),
+                    self.animate_mobject(
+                        cls.table_program_point_rectangle,
+                        None,
+                    ) as (
+                        table_program_point_animation,
+                        cls.table_program_point_rectangle,
+                    ),
+                    self.animate_mobject(
+                        cls.successor_program_point_rectangle,
+                        None,
+                    ) as (
                         successor_program_point_animation,
+                        cls.successor_program_point_rectangle,
+                    ),
+                    self.animate_mobject(
+                        cls.table_successor_program_point_rectangle,
+                        None,
+                    ) as (
                         table_successor_program_point_animation,
+                        cls.table_successor_program_point_rectangle,
+                    ),
+                ):
+                    if (
+                        successor_program_point_animation is not None
+                        and table_successor_program_point_animation is not None
+                    ):
+                        self.play(
+                            successor_program_point_animation,
+                            table_successor_program_point_animation,
+                        )
+
+                    self.play(
+                        res_table_animation,
+                        program_point_animation,
+                        table_program_point_animation,
                     )
 
-                self.play(
-                    res_table_animation,
-                    program_point_animation,
-                    table_program_point_animation,
-                )
+            @classmethod
+            def after_worklist_algorithm(
+                cls,
+                variables: Set[str],
+                abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
+            ):
+                self.wait(self.worklist_wait_time)
 
-        self.wait(self.worklist_wait_time)
+        return WorklistAnimation
+
+    def worklist(
+        self,
+        entry_point: ProgramPoint,
+        program_cfg: nx.DiGraph[ProgramPoint],
+        cfg: ControlFlowGraph,
+        lattice_graph: LatticeGraph[L],
+        control_flow_function_tex: AbstractEnvironmentUpdateInstances,
+        flow_function_tex: AbstractEnvironmentUpdateInstances | None,
+        condition_update_function_tex: AbstractEnvironmentUpdateInstances,
+    ):
+        listener = self.create_worklist_listener(
+            lattice_graph,
+            cfg,
+            control_flow_function_tex,
+            flow_function_tex,
+            condition_update_function_tex,
+        )
+
+        worklist_algorithm(
+            self.program.parameters,
+            self.program.variables,
+            self.lattice,
+            self.control_flow_function,
+            self.condition_update_function,
+            entry_point,
+            program_cfg,
+            listener,
+        )
 
     def construct(self):
         self.play(self.move_camera_animation(self.title_camera_position))
