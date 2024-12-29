@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Collection, Generic, Mapping, Set, TypeVar, Protocol
+from typing import Collection, Generic, Mapping, Set, TypeVar, Protocol, TypedDict
 
 from manim.mobject.table import MobjectTable
 from manim.mobject.text.tex_mobject import MathTex
@@ -122,200 +122,137 @@ class ResTable(MobjectTable, Generic[L]):
         return self.res_cond_mobjects[variable]
 
 
+class BeforeWorklistCreationDict(TypedDict, Generic[L]):
+    variables: Set[str]
+    abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]]
+
+
+class AfterWorklistCreationDict(BeforeWorklistCreationDict[L]):
+    worklist: Set[ProgramPoint]
+
+
+class AfterProgramPointSelectionDict(AfterWorklistCreationDict[L]):
+    program_point: ProgramPoint
+
+
+class AfterControlFlowFunctionApplicationDict(AfterProgramPointSelectionDict[L]):
+    res: AbstractEnvironment[L]
+    res_variables: Mapping[str, L]
+    res_instance_id: int
+
+
+class BeforeSuccessorIterationDict(AfterControlFlowFunctionApplicationDict[L]):
+    successor: ProgramPoint
+
+
+class AfterConditionUpdateFunctionApplicationDict(
+    AfterControlFlowFunctionApplicationDict[L], Generic[L, E]
+):
+    condition: E
+    res_cond: AbstractEnvironment[L] | None
+    res_cond_variables: Mapping[str, L] | None
+    res_cond_instance_id: int
+
+
+class AfterIncludedDict(AfterConditionUpdateFunctionApplicationDict[L, E]):
+    included: bool
+
+
+class WhileJoinDict(AfterIncludedDict[L, E]):
+    variable: str
+    joined_abstract_value: L
+    current_abstract_value: L
+    successor_abstract_value: L
+
+
 class WorklistListener(Protocol[L, E]):
     def before_worklist_creation(
         self,
-        variables: Set[str],
-        abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
+        data: BeforeWorklistCreationDict[L],
     ):
         """Called before the worklist is created."""
 
     def after_worklist_creation(
         self,
-        variables: Set[str],
-        abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
-        worklist: Set[ProgramPoint],
+        data: AfterWorklistCreationDict[L],
     ):
         """Called after the worklist is created."""
 
     def before_iteration(
         self,
-        variables: Set[str],
-        abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
-        worklist: Set[ProgramPoint],
+        data: AfterWorklistCreationDict[L],
     ):
         """Called before an iteration of the worklist algorithm."""
 
     def after_program_point_selection(
         self,
-        program_point: ProgramPoint,
-        variables: Set[str],
-        abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
-        worklist: Set[ProgramPoint],
+        data: AfterProgramPointSelectionDict[L],
     ):
         """Called after a program point is selected from the worklist."""
 
     def after_control_flow_function_application(
         self,
-        program_point: ProgramPoint,
-        variables: Set[str],
-        abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
-        worklist: Set[ProgramPoint],
-        res: AbstractEnvironment[L],
-        res_variables: Mapping[str, L],
-        res_instance_id: int,
+        data: AfterControlFlowFunctionApplicationDict[L],
     ):
         """Called after the control flow function is applied."""
 
     def before_successor_iteration(
         self,
-        program_point: ProgramPoint,
-        variables: Set[str],
-        abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
-        worklist: Set[ProgramPoint],
-        successor: ProgramPoint,
+        data: BeforeSuccessorIterationDict[L],
     ):
         """Called before a successor is added to the worklist."""
 
     def after_condition_update_function_application(
         self,
-        program_point: ProgramPoint,
-        variables: Set[str],
-        abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
-        worklist: Set[ProgramPoint],
-        res: AbstractEnvironment[L],
-        res_variables: Mapping[str, L],
-        res_instance_id: int,
-        successor: ProgramPoint,
-        condition: E,
-        res_cond: AbstractEnvironment[L] | None,
-        res_cond_variables: Mapping[str, L] | None,
-        res_cond_instance_id: int,
+        data: AfterConditionUpdateFunctionApplicationDict[L, E],
     ):
         """Called after the condition update function is applied."""
 
     def after_included(
         self,
-        program_point: ProgramPoint,
-        variables: Set[str],
-        abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
-        worklist: Set[ProgramPoint],
-        res: AbstractEnvironment[L],
-        res_variables: Mapping[str, L],
-        res_instance_id: int,
-        successor: ProgramPoint,
-        condition: E,
-        res_cond: AbstractEnvironment[L] | None,
-        res_cond_variables: Mapping[str, L] | None,
-        res_cond_instance_id: int,
-        included: bool,
+        data: AfterIncludedDict[L, E],
     ):
         """Called after the res_cond abstract environment is included in the successor abstract environment."""
 
     def after_not_included(
         self,
-        program_point: ProgramPoint,
-        variables: Set[str],
-        abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
-        worklist: Set[ProgramPoint],
-        res: AbstractEnvironment[L],
-        res_variables: Mapping[str, L],
-        res_instance_id: int,
-        successor: ProgramPoint,
-        condition: E,
-        res_cond: AbstractEnvironment[L] | None,
-        res_cond_variables: Mapping[str, L] | None,
-        res_cond_instance_id: int,
+        data: AfterIncludedDict[L, E],
     ):
         """Called after the res_cond abstract environment is not included in the successor abstract environment."""
 
     def while_join(
         self,
-        program_point: ProgramPoint,
-        variables: Set[str],
-        abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
-        worklist: Set[ProgramPoint],
-        res: AbstractEnvironment[L],
-        res_variables: Mapping[str, L],
-        res_instance_id: int,
-        successor: ProgramPoint,
-        condition: E,
-        res_cond: AbstractEnvironment[L] | None,
-        res_cond_variables: Mapping[str, L] | None,
-        res_cond_instance_id: int,
-        variable: str,
-        joined_abstract_value: L,
-        current_abstract_value: L,
-        successor_abstract_value: L,
+        data: WhileJoinDict[L, E],
     ):
         """Called while the join operation is applied."""
 
     def after_join(
         self,
-        program_point: ProgramPoint,
-        variables: Set[str],
-        abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
-        worklist: Set[ProgramPoint],
-        res: AbstractEnvironment[L],
-        res_variables: Mapping[str, L],
-        res_instance_id: int,
-        successor: ProgramPoint,
-        condition: E,
-        res_cond: AbstractEnvironment[L] | None,
-        res_cond_variables: Mapping[str, L] | None,
-        res_cond_instance_id: int,
+        data: AfterIncludedDict[L, E],
     ):
         """Called after the join operation is applied."""
 
     def after_add(
         self,
-        program_point: ProgramPoint,
-        variables: Set[str],
-        abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
-        worklist: Set[ProgramPoint],
-        res: AbstractEnvironment[L],
-        res_variables: Mapping[str, L],
-        res_instance_id: int,
-        successor: ProgramPoint,
-        condition: E,
-        res_cond: AbstractEnvironment[L] | None,
-        res_cond_variables: Mapping[str, L] | None,
-        res_cond_instance_id: int,
+        data: AfterIncludedDict[L, E],
     ):
         """Called after a successor is added to the worklist."""
 
     def after_successor_iteration(
         self,
-        program_point: ProgramPoint,
-        variables: Set[str],
-        abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
-        worklist: Set[ProgramPoint],
-        res: AbstractEnvironment[L],
-        res_variables: Mapping[str, L],
-        res_instance_id: int,
-        successor: ProgramPoint,
-        condition: E,
-        res_cond: AbstractEnvironment[L] | None,
-        res_cond_variables: Mapping[str, L] | None,
-        res_cond_instance_id: int,
+        data: AfterIncludedDict[L, E],
     ):
         """Called after a successor is added to the worklist."""
 
     def after_iteration(
         self,
-        variables: Set[str],
-        abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
-        worklist: Set[ProgramPoint],
-        res: AbstractEnvironment[L],
-        res_variables: Mapping[str, L],
-        res_instance_id: int,
+        data: AfterControlFlowFunctionApplicationDict[L],
     ):
         """Called after an iteration of the worklist algorithm."""
 
     def after_worklist_algorithm(
         self,
-        variables: Set[str],
-        abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
+        data: AfterWorklistCreationDict[L],
     ):
         """Called after the worklist algorithm is finished."""
 
@@ -330,225 +267,129 @@ def worklist_algorithm(
     program_cfg: nx.DiGraph[ProgramPoint],
     listener: WorklistListener,
 ):
-    abstract_environments = {
-        p: AbstractEnvironment(
-            lattice,
-            frozendict(
-                (
-                    *((variable, lattice.bottom()) for variable in variables),
-                    *((parameter, lattice.top()) for parameter in parameters),
-                )
-            ),
-        )
-        for p in program_cfg.nodes
+    data: BeforeWorklistCreationDict[L] = {
+        "variables": variables.union(parameters),
+        "abstract_environments": {
+            p: AbstractEnvironment(
+                lattice,
+                frozendict(
+                    (
+                        *((variable, lattice.bottom()) for variable in variables),
+                        *((parameter, lattice.top()) for parameter in parameters),
+                    )
+                ),
+            )
+            for p in program_cfg.nodes
+        },
     }
 
-    variables = variables.union(parameters)
+    listener.before_worklist_creation(data)
 
-    listener.before_worklist_creation(
-        variables,
-        abstract_environments,
-    )
+    data: BeforeWorklistCreationDict[L] | AfterWorklistCreationDict[L]
 
-    worklist = {entry_point}
+    data["worklist"] = {entry_point}
 
-    listener.after_worklist_creation(
-        variables,
-        abstract_environments,
-        worklist,
-    )
+    listener.after_worklist_creation(data)
 
-    while worklist:
-        listener.before_iteration(
-            variables,
-            abstract_environments,
-            worklist,
-        )
+    while data["worklist"]:
+        listener.before_iteration(data)
 
-        program_point = worklist.pop()
+        data: AfterWorklistCreationDict[L] | AfterProgramPointSelectionDict[L]
 
-        listener.after_program_point_selection(
-            program_point,
-            variables,
-            abstract_environments,
-            worklist,
+        data["program_point"] = data["worklist"].pop()
+
+        listener.after_program_point_selection(data)
+
+        data: (
+            AfterProgramPointSelectionDict[L]
+            | AfterControlFlowFunctionApplicationDict[L]
         )
 
         (
-            res,
-            res_variables,
-            res_instance_id,
+            data["res"],
+            data["res_variables"],
+            data["res_instance_id"],
         ) = control_flow_function.apply_and_get_variables(
-            program_point, abstract_environments[program_point]
+            data["program_point"],
+            data["abstract_environments"][data["program_point"]],
         )
 
-        listener.after_control_flow_function_application(
-            program_point,
-            variables,
-            abstract_environments,
-            worklist,
-            res,
-            res_variables,
-            res_instance_id,
-        )
+        listener.after_control_flow_function_application(data)
 
-        for successor in succ(program_cfg, program_point):
-            listener.before_successor_iteration(
-                program_point,
-                variables,
-                abstract_environments,
-                worklist,
-                successor,
+        for successor in succ(program_cfg, data["program_point"]):
+            data: (
+                AfterControlFlowFunctionApplicationDict[L]
+                | BeforeSuccessorIterationDict[L]
             )
 
-            condition: E = cond(program_cfg, program_point, successor)
+            data["successor"] = successor
+
+            listener.before_successor_iteration(data)
+
+            data: (
+                BeforeSuccessorIterationDict[L]
+                | AfterConditionUpdateFunctionApplicationDict[L, E]
+            )
+
+            data["condition"] = cond(
+                program_cfg,
+                data["program_point"],
+                data["successor"],
+            )
 
             (
-                res_cond,
-                res_cond_variables,
-                res_cond_instance_id,
+                data["res_cond"],
+                data["res_cond_variables"],
+                data["res_cond_instance_id"],
             ) = condition_update_function.apply_and_get_variables(
-                condition,
-                res,
+                data["condition"],
+                data["res"],
             )
 
-            listener.after_condition_update_function_application(
-                program_point,
-                variables,
-                abstract_environments,
-                worklist,
-                res,
-                res_variables,
-                res_instance_id,
-                successor,
-                condition,
-                res_cond,
-                res_cond_variables,
-                res_cond_instance_id,
+            listener.after_condition_update_function_application(data)
+
+            data: (
+                AfterConditionUpdateFunctionApplicationDict[L, E]
+                | AfterIncludedDict[L, E]
             )
 
-            included = abstract_environments[successor].includes(res_cond)
+            data["included"] = data["abstract_environments"][
+                data["successor"]
+            ].includes(data["res_cond"])
 
-            listener.after_included(
-                program_point,
-                variables,
-                abstract_environments,
-                worklist,
-                res,
-                res_variables,
-                res_instance_id,
-                successor,
-                condition,
-                res_cond,
-                res_cond_variables,
-                res_cond_instance_id,
-                included,
-            )
+            listener.after_included(data)
 
-            if not included:
-                listener.after_not_included(
-                    program_point,
-                    variables,
-                    abstract_environments,
-                    worklist,
-                    res,
-                    res_variables,
-                    res_instance_id,
-                    successor,
-                    condition,
-                    res_cond,
-                    res_cond_variables,
-                    res_cond_instance_id,
-                )
+            if not data["included"]:
+                listener.after_not_included(data)
 
-                for variable, joined_abstract_value in abstract_environments[
-                    successor
-                ].join_generator(res_cond):
-                    current_abstract_value = res_cond[variable]
-                    successor_abstract_value = abstract_environments[successor][
-                        variable
-                    ]
+                for variable, joined_abstract_value in data["abstract_environments"][
+                    data["successor"]
+                ].join_generator(data["res_cond"]):
+                    data: AfterIncludedDict[L, E] | WhileJoinDict[L, E]
 
-                    abstract_environments[successor] = abstract_environments[
-                        successor
-                    ].set({variable: joined_abstract_value})
+                    data["variable"] = variable
+                    data["joined_abstract_value"] = joined_abstract_value
+                    data["current_abstract_value"] = data["res_cond"][data["variable"]]
+                    data["successor_abstract_value"] = data["abstract_environments"][
+                        data["successor"]
+                    ][data["variable"]]
 
-                    listener.while_join(
-                        program_point,
-                        variables,
-                        abstract_environments,
-                        worklist,
-                        res,
-                        res_variables,
-                        res_instance_id,
-                        successor,
-                        condition,
-                        res_cond,
-                        res_cond_variables,
-                        res_cond_instance_id,
-                        variable,
-                        joined_abstract_value,
-                        current_abstract_value,
-                        successor_abstract_value,
+                    data["abstract_environments"][data["successor"]] = data[
+                        "abstract_environments"
+                    ][data["successor"]].set(
+                        {data["variable"]: data["joined_abstract_value"]}
                     )
 
-                listener.after_join(
-                    program_point,
-                    variables,
-                    abstract_environments,
-                    worklist,
-                    res,
-                    res_variables,
-                    res_instance_id,
-                    successor,
-                    condition,
-                    res_cond,
-                    res_cond_variables,
-                    res_cond_instance_id,
-                )
+                    listener.while_join(data)
 
-                worklist.add(successor)
+                listener.after_join(data)
 
-                listener.after_add(
-                    program_point,
-                    variables,
-                    abstract_environments,
-                    worklist,
-                    res,
-                    res_variables,
-                    res_instance_id,
-                    successor,
-                    condition,
-                    res_cond,
-                    res_cond_variables,
-                    res_cond_instance_id,
-                )
+                data["worklist"].add(data["successor"])
 
-            listener.after_successor_iteration(
-                program_point,
-                variables,
-                abstract_environments,
-                worklist,
-                res,
-                res_variables,
-                res_instance_id,
-                successor,
-                condition,
-                res_cond,
-                res_cond_variables,
-                res_cond_instance_id,
-            )
+                listener.after_add(data)
 
-        listener.after_iteration(
-            variables,
-            abstract_environments,
-            worklist,
-            res,
-            res_variables,
-            res_instance_id,
-        )
+            listener.after_successor_iteration(data)
 
-    listener.after_worklist_algorithm(
-        variables,
-        abstract_environments,
-    )
+        listener.after_iteration(data)
+
+    listener.after_worklist_algorithm(data)
