@@ -104,6 +104,7 @@ class WorklistExtraDataDict(TypedDict, Generic[L], total=False):
     worklist_condition_update_variables_title: Text
     worklist_res_variables_title: Text
 
+    worklist_unreachable_title: Text
     worklist_included_title: Text
 
     new_lattice_graph: LatticeGraph[L]
@@ -268,6 +269,9 @@ class AbstractAnalysisScene(
     worklist_successor_title_template: str = (
         "We try to check if we need to process the successor {successor_program_point} :"  # noqa: E501
     )
+    worklist_unreachable_title_template: str = (
+        "We reached an unreachable program point {successor_program_point} so we skip it :"
+    )
     worklist_condition_update_variables_title_template: str = (
         "We update the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the condition update function :"  # noqa: E501
     )
@@ -288,15 +292,25 @@ class AbstractAnalysisScene(
     )
     worklist_camera_position: tuple[float, float, float] = (0, 0, 0)
     worklist_pop_wait_time: float = 5.0
+    worklist_unreachable_wait_time: float = 5.0
     worklist_control_flow_variables_wait_time: float = 5.0
+    worklist_table_width: float = fw(0.45)
+    worklist_table_height: float = fh(0.55)
+    worklist_table_position: tuple[float, float, float] = (fw(0.25), fh(-0.2), 0)
     worklist_table_variables_wait_time: float = 5.0
     worklist_successor_wait_time: float = 5.0
     worklist_condition_update_variables_wait_time: float = 5.0
+    worklist_res_table_width: float = fw(0.45)
+    worklist_res_table_height: float = fh(0.25)
+    worklist_res_table_position: tuple[float, float, float] = (fw(0.25), fh(0.225), 0)
     worklist_res_variables_wait_time: float = 5.0
     worklist_included_wait_time: float = 5.0
     worklist_joined_values_wait_time: float = 5.0
     worklist_add_successor_wait_time: float = 5.0
     worklist_wait_time: float = 5.0
+    worklist_tex_width: float = fw(0.45)
+    worklist_tex_height: float = fh(0.10)
+    worklist_tex_position: tuple[float, float, float] = (fw(0.25), fh(0.425), 0)
 
     def show_title(self) -> None:
         title = Text(self.title)
@@ -781,13 +795,11 @@ class AbstractAnalysisScene(
 
         scale_mobject(
             table,
-            self.camera.frame_width * 0.45,
-            self.camera.frame_height * 0.55,
+            self.worklist_table_width,
+            self.worklist_table_height,
         )
 
-        table.move_to(
-            (self.camera.frame_width * 0.25, self.camera.frame_height * -0.2, 0)
-        )
+        table.move_to(self.worklist_table_position)
 
         return table
 
@@ -801,13 +813,11 @@ class AbstractAnalysisScene(
 
         scale_mobject(
             res_table,
-            self.camera.frame_width * 0.45,
-            self.camera.frame_height * 0.25,
+            self.worklist_res_table_width,
+            self.worklist_res_table_height,
         )
 
-        res_table.move_to(
-            (self.camera.frame_width * 0.25, self.camera.frame_height * 0.225, 0)
-        )
+        res_table.move_to(self.worklist_res_table_position)
 
         return res_table
 
@@ -816,13 +826,11 @@ class AbstractAnalysisScene(
 
         scale_mobject(
             worklist_tex,
-            self.camera.frame_width * 0.45,
-            self.camera.frame_height * 0.10,
+            self.worklist_tex_width,
+            self.worklist_tex_height,
         )
 
-        worklist_tex.move_to(
-            (self.camera.frame_width * 0.25, self.camera.frame_height * 0.425, 0)
-        )
+        worklist_tex.move_to(self.worklist_tex_position)
 
         return worklist_tex
 
@@ -1275,6 +1283,29 @@ class AbstractAnalysisScene(
         self.wait(self.worklist_res_variables_wait_time)
 
         self.play(Uncreate(extra_data["worklist_res_variables_title"]))
+
+    def after_unreachable_code(
+        self,
+        data: AfterConditionUpdateFunctionApplicationDict[L, E],
+        extra_data: WorklistExtraDataDict[L],
+    ):
+        extra_data["worklist_unreachable_title"] = Text(
+            self.worklist_unreachable_title_template.format(
+                successor_program_point=str(data["successor"].point)
+            )
+        )
+        scale_mobject(
+            extra_data["worklist_unreachable_title"],
+            self.cfg_title_width,
+            self.cfg_title_height,
+        )
+        extra_data["worklist_unreachable_title"].move_to(self.cfg_title_position)
+
+        self.play(Create(extra_data["worklist_unreachable_title"]))
+
+        self.wait(self.worklist_unreachable_wait_time)
+
+        self.play(Uncreate(extra_data["worklist_unreachable_title"]))
 
     def after_included(
         self,

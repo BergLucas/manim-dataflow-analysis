@@ -146,7 +146,7 @@ class BeforeSuccessorIterationDict(AfterControlFlowFunctionApplicationDict[L]):
 
 
 class AfterConditionUpdateFunctionApplicationDict(
-    AfterControlFlowFunctionApplicationDict[L], Generic[L, E]
+    BeforeSuccessorIterationDict[L], Generic[L, E]
 ):
     condition: E
     res_cond: AbstractEnvironment[L] | None
@@ -209,7 +209,7 @@ class WorklistListener(Protocol[L, E, EX]):
         data: BeforeSuccessorIterationDict[L],
         extra_data: EX,
     ) -> None:
-        """Called before a successor is added to the worklist."""
+        """Called before a successor is processed."""
 
     def after_condition_update_function_application(
         self,
@@ -217,6 +217,13 @@ class WorklistListener(Protocol[L, E, EX]):
         extra_data: EX,
     ) -> None:
         """Called after the condition update function is applied."""
+
+    def after_unreachable_code(
+        self,
+        data: AfterConditionUpdateFunctionApplicationDict[L, E],
+        extra_data: EX,
+    ) -> None:
+        """Called after the condition update function detects unreachable code."""
 
     def after_included(
         self,
@@ -258,7 +265,7 @@ class WorklistListener(Protocol[L, E, EX]):
         data: AfterIncludedDict[L, E],
         extra_data: EX,
     ) -> None:
-        """Called after a successor is added to the worklist."""
+        """Called after a successor is processed."""
 
     def after_iteration(
         self,
@@ -372,40 +379,45 @@ def worklist_algorithm(
                 | AfterIncludedDict[L, E]
             )
 
-            data["included"] = data["abstract_environments"][
-                data["successor"]
-            ].includes(data["res_cond"])
-
-            listener.after_included(data, extra_data)
-
-            if not data["included"]:
-                listener.after_not_included(data, extra_data)
-
-                for variable, joined_abstract_value in data["abstract_environments"][
+            if data["res_cond"] is None:
+                listener.after_unreachable_code(data, extra_data)
+            else:
+                data["included"] = data["abstract_environments"][
                     data["successor"]
-                ].join_generator(data["res_cond"]):
-                    data: AfterIncludedDict[L, E] | WhileJoinDict[L, E]
+                ].includes(data["res_cond"])
 
-                    data["variable"] = variable
-                    data["joined_abstract_value"] = joined_abstract_value
-                    data["current_abstract_value"] = data["res_cond"][data["variable"]]
-                    data["successor_abstract_value"] = data["abstract_environments"][
-                        data["successor"]
-                    ][data["variable"]]
+                listener.after_included(data, extra_data)
 
-                    data["abstract_environments"][data["successor"]] = data[
+                if not data["included"]:
+                    listener.after_not_included(data, extra_data)
+
+                    for variable, joined_abstract_value in data[
                         "abstract_environments"
-                    ][data["successor"]].set(
-                        {data["variable"]: data["joined_abstract_value"]}
-                    )
+                    ][data["successor"]].join_generator(data["res_cond"]):
+                        data: AfterIncludedDict[L, E] | WhileJoinDict[L, E]
 
-                    listener.while_join(data, extra_data)
+                        data["variable"] = variable
+                        data["joined_abstract_value"] = joined_abstract_value
+                        data["current_abstract_value"] = data["res_cond"][
+                            data["variable"]
+                        ]
+                        data["successor_abstract_value"] = data[
+                            "abstract_environments"
+                        ][data["successor"]][data["variable"]]
 
-                listener.after_join(data, extra_data)
+                        data["abstract_environments"][data["successor"]] = data[
+                            "abstract_environments"
+                        ][data["successor"]].set(
+                            {data["variable"]: data["joined_abstract_value"]}
+                        )
 
-                data["worklist"].add(data["successor"])
+                        listener.while_join(data, extra_data)
 
-                listener.after_add(data, extra_data)
+                    listener.after_join(data, extra_data)
+
+                    data["worklist"].add(data["successor"])
+
+                    listener.after_add(data, extra_data)
 
             listener.after_successor_iteration(data, extra_data)
 
