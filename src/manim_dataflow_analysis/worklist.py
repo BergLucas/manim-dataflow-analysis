@@ -165,95 +165,117 @@ class WhileJoinDict(AfterIncludedDict[L, E]):
     successor_abstract_value: L
 
 
-class WorklistListener(Protocol[L, E]):
+EX = TypeVar("EX", bound=dict[str, object])
+
+
+class WorklistListener(Protocol[L, E, EX]):
+    def create_extra_data(self) -> EX:
+        """Create the extra data that is passed through the worklist algorithm."""
+        return {}
+
     def before_worklist_creation(
         self,
         data: BeforeWorklistCreationDict[L],
-    ):
+        extra_data: EX,
+    ) -> None:
         """Called before the worklist is created."""
 
     def after_worklist_creation(
         self,
         data: AfterWorklistCreationDict[L],
-    ):
+        extra_data: EX,
+    ) -> None:
         """Called after the worklist is created."""
 
     def before_iteration(
         self,
         data: AfterWorklistCreationDict[L],
-    ):
+        extra_data: EX,
+    ) -> None:
         """Called before an iteration of the worklist algorithm."""
 
     def after_program_point_selection(
         self,
         data: AfterProgramPointSelectionDict[L],
-    ):
+        extra_data: EX,
+    ) -> None:
         """Called after a program point is selected from the worklist."""
 
     def after_control_flow_function_application(
         self,
         data: AfterControlFlowFunctionApplicationDict[L],
-    ):
+        extra_data: EX,
+    ) -> None:
         """Called after the control flow function is applied."""
 
     def before_successor_iteration(
         self,
         data: BeforeSuccessorIterationDict[L],
-    ):
+        extra_data: EX,
+    ) -> None:
         """Called before a successor is added to the worklist."""
 
     def after_condition_update_function_application(
         self,
         data: AfterConditionUpdateFunctionApplicationDict[L, E],
-    ):
+        extra_data: EX,
+    ) -> None:
         """Called after the condition update function is applied."""
 
     def after_included(
         self,
         data: AfterIncludedDict[L, E],
-    ):
+        extra_data: EX,
+    ) -> None:
         """Called after the res_cond abstract environment is included in the successor abstract environment."""
 
     def after_not_included(
         self,
         data: AfterIncludedDict[L, E],
-    ):
+        extra_data: EX,
+    ) -> None:
         """Called after the res_cond abstract environment is not included in the successor abstract environment."""
 
     def while_join(
         self,
         data: WhileJoinDict[L, E],
-    ):
+        extra_data: EX,
+    ) -> None:
         """Called while the join operation is applied."""
 
     def after_join(
         self,
         data: AfterIncludedDict[L, E],
-    ):
+        extra_data: EX,
+    ) -> None:
         """Called after the join operation is applied."""
 
     def after_add(
         self,
         data: AfterIncludedDict[L, E],
-    ):
+        extra_data: EX,
+    ) -> None:
         """Called after a successor is added to the worklist."""
 
     def after_successor_iteration(
         self,
         data: AfterIncludedDict[L, E],
-    ):
+        extra_data: EX,
+    ) -> None:
         """Called after a successor is added to the worklist."""
 
     def after_iteration(
         self,
         data: AfterControlFlowFunctionApplicationDict[L],
-    ):
+        extra_data: EX,
+    ) -> None:
         """Called after an iteration of the worklist algorithm."""
 
     def after_worklist_algorithm(
         self,
         data: AfterWorklistCreationDict[L],
-    ):
+        extra_data: EX,
+    ) -> None:
         """Called after the worklist algorithm is finished."""
 
 
@@ -265,8 +287,10 @@ def worklist_algorithm(
     condition_update_function: ConditionUpdateFunction[L, E],
     entry_point: ProgramPoint,
     program_cfg: nx.DiGraph[ProgramPoint],
-    listener: WorklistListener,
+    listener: WorklistListener[L, E, EX],
 ):
+    extra_data = listener.create_extra_data()
+
     data: BeforeWorklistCreationDict[L] = {
         "variables": variables.union(parameters),
         "abstract_environments": {
@@ -283,22 +307,22 @@ def worklist_algorithm(
         },
     }
 
-    listener.before_worklist_creation(data)
+    listener.before_worklist_creation(data, extra_data)
 
     data: BeforeWorklistCreationDict[L] | AfterWorklistCreationDict[L]
 
     data["worklist"] = {entry_point}
 
-    listener.after_worklist_creation(data)
+    listener.after_worklist_creation(data, extra_data)
 
     while data["worklist"]:
-        listener.before_iteration(data)
+        listener.before_iteration(data, extra_data)
 
         data: AfterWorklistCreationDict[L] | AfterProgramPointSelectionDict[L]
 
         data["program_point"] = data["worklist"].pop()
 
-        listener.after_program_point_selection(data)
+        listener.after_program_point_selection(data, extra_data)
 
         data: (
             AfterProgramPointSelectionDict[L]
@@ -314,7 +338,7 @@ def worklist_algorithm(
             data["abstract_environments"][data["program_point"]],
         )
 
-        listener.after_control_flow_function_application(data)
+        listener.after_control_flow_function_application(data, extra_data)
 
         for successor in succ(program_cfg, data["program_point"]):
             data: (
@@ -324,7 +348,7 @@ def worklist_algorithm(
 
             data["successor"] = successor
 
-            listener.before_successor_iteration(data)
+            listener.before_successor_iteration(data, extra_data)
 
             data: (
                 BeforeSuccessorIterationDict[L]
@@ -346,7 +370,7 @@ def worklist_algorithm(
                 data["res"],
             )
 
-            listener.after_condition_update_function_application(data)
+            listener.after_condition_update_function_application(data, extra_data)
 
             data: (
                 AfterConditionUpdateFunctionApplicationDict[L, E]
@@ -357,10 +381,10 @@ def worklist_algorithm(
                 data["successor"]
             ].includes(data["res_cond"])
 
-            listener.after_included(data)
+            listener.after_included(data, extra_data)
 
             if not data["included"]:
-                listener.after_not_included(data)
+                listener.after_not_included(data, extra_data)
 
                 for variable, joined_abstract_value in data["abstract_environments"][
                     data["successor"]
@@ -380,16 +404,18 @@ def worklist_algorithm(
                         {data["variable"]: data["joined_abstract_value"]}
                     )
 
-                    listener.while_join(data)
+                    listener.while_join(data, extra_data)
 
-                listener.after_join(data)
+                listener.after_join(data, extra_data)
 
                 data["worklist"].add(data["successor"])
 
-                listener.after_add(data)
+                listener.after_add(data, extra_data)
 
-            listener.after_successor_iteration(data)
+            listener.after_successor_iteration(data, extra_data)
 
-        listener.after_iteration(data)
+        listener.after_iteration(data, extra_data)
 
-    listener.after_worklist_algorithm(data)
+    listener.after_worklist_algorithm(data, extra_data)
+
+    return data, extra_data
