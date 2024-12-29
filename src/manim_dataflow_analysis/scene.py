@@ -13,7 +13,6 @@ from typing import (
 )
 
 from frozendict import frozendict
-from manim import config
 from manim.animation.creation import Create, Uncreate, Unwrite, Write
 from manim.animation.transform import FadeTransform, Transform
 from manim.camera.moving_camera import MovingCamera
@@ -37,6 +36,7 @@ from manim_dataflow_analysis.lattice import (
     default_sorting_function,
 )
 from manim_dataflow_analysis.worklist import ResTable, WorklistTable, WorklistTex
+from manim_dataflow_analysis.scale import fh, fw, scale_mobject
 
 if TYPE_CHECKING:
     import networkx as nx
@@ -48,14 +48,6 @@ if TYPE_CHECKING:
         ConditionUpdateFunction,
     )
     from manim_dataflow_analysis.flow_function import ControlFlowFunction
-
-
-def fw(scale_w: float):
-    return scale_w * config.frame_width
-
-
-def fh(scale_y: float):
-    return scale_y * config.frame_height
 
 
 L = TypeVar("L", bound=Hashable)
@@ -245,7 +237,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     def show_title(self) -> None:
         title = Text(self.title)
 
-        self.scale_mobject(title, self.title_width, self.title_height)
+        scale_mobject(title, self.title_width, self.title_height)
         title.move_to(self.title_position)
 
         self.play(Write(title))
@@ -266,7 +258,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
             layout_config={"sorting_function": type(self).sorting_function},
         )
 
-        self.scale_mobject(lattice_graph, self.lattice_width, self.lattice_height)
+        scale_mobject(lattice_graph, self.lattice_width, self.lattice_height)
         lattice_graph.move_to(self.lattice_position)
 
         return lattice_graph
@@ -274,7 +266,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     def show_lattice_graph(self) -> LatticeGraph[L]:
         lattice_title = Text(self.lattice_title)
 
-        self.scale_mobject(
+        scale_mobject(
             lattice_title, self.lattice_title_width, self.lattice_title_height
         )
         lattice_title.move_to(self.lattice_title_position)
@@ -292,7 +284,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     def show_control_flow_function(self) -> AbstractEnvironmentUpdateInstances:
         control_flow_function_title = Text(self.control_flow_function_title)
 
-        self.scale_mobject(
+        scale_mobject(
             control_flow_function_title,
             self.control_flow_function_title_width,
             self.control_flow_function_title_width,
@@ -303,7 +295,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
             self.control_flow_function.instances
         )
 
-        self.scale_mobject(
+        scale_mobject(
             control_flow_function_tex,
             self.control_flow_function_width,
             self.control_flow_function_height,
@@ -325,7 +317,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
         flow_function_title = Text(self.flow_function_title)
 
-        self.scale_mobject(
+        scale_mobject(
             flow_function_title,
             self.flow_function_title_width,
             self.flow_function_title_width,
@@ -336,7 +328,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
             self.control_flow_function.flow_function.instances
         )
 
-        self.scale_mobject(
+        scale_mobject(
             flow_function_tex,
             self.condition_update_function_width,
             self.condition_update_function_height,
@@ -355,7 +347,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     def show_condition_update_function(self) -> AbstractEnvironmentUpdateInstances:
         condition_update_function_title = Text(self.condition_update_function_title)
 
-        self.scale_mobject(
+        scale_mobject(
             condition_update_function_title,
             self.condition_update_function_title_width,
             self.condition_update_function_title_width,
@@ -368,7 +360,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
             self.condition_update_function.instances
         )
 
-        self.scale_mobject(
+        scale_mobject(
             condition_update_function_tex,
             self.condition_update_function_width,
             self.condition_update_function_height,
@@ -387,7 +379,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     def show_program(self) -> Code:
         program_title = Text(self.program_title)
 
-        self.scale_mobject(
+        scale_mobject(
             program_title,
             self.program_title_width,
             self.program_title_height,
@@ -404,7 +396,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
             line_no_from=self.program.line_number,
         )
 
-        self.scale_mobject(program, self.program_width, self.program_height)
+        scale_mobject(program, self.program_width, self.program_height)
         program.move_to(self.program_position)
 
         self.play(Write(program_title), Create(program))
@@ -413,7 +405,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
         new_program = program.copy()
 
-        self.scale_mobject(
+        scale_mobject(
             new_program,
             self.program_new_width,
             self.program_new_height,
@@ -437,7 +429,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
         program_conversion_title = Text(self.program_conversion_title)
 
-        self.scale_mobject(
+        scale_mobject(
             program_conversion_title,
             self.program_conversion_title_width,
             self.program_conversion_title_height,
@@ -448,7 +440,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
 
         cfg = ControlFlowGraph.from_cfg(entry_point, program_cfg)
 
-        self.scale_mobject(cfg, self.cfg_width, self.cfg_height)
+        scale_mobject(cfg, self.cfg_width, self.cfg_height)
         cfg.move_to(self.cfg_position)
 
         self.play(Write(program_conversion_title))
@@ -480,7 +472,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                 statement=str(statement.header),
             )
         )
-        self.scale_mobject(
+        scale_mobject(
             worklist_flow_function_title,
             self.flow_function_title_width,
             self.flow_function_title_height,
@@ -555,7 +547,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                 statement=str(program_point.statement.header),
             )
         )
-        self.scale_mobject(
+        scale_mobject(
             worklist_control_flow_function_title,
             self.control_flow_function_title_width,
             self.control_flow_function_title_height,
@@ -647,7 +639,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                 condition=str(condition_expression),
             )
         )
-        self.scale_mobject(
+        scale_mobject(
             worklist_condition_update_function_title,
             self.condition_update_function_title_width,
             self.condition_update_function_title_height,
@@ -716,17 +708,6 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         else:
             yield None, new_mobject
 
-    def scale_mobject(self, mobject: Mobject, max_x: float, max_y: float) -> None:
-        if mobject.width >= mobject.height:
-            if max_y / max_x >= mobject.height / mobject.width:
-                mobject.scale(max_x / mobject.width)
-            else:
-                mobject.scale(max_y / mobject.height)
-        elif max_x / max_y >= mobject.width / mobject.height:
-            mobject.scale(max_y / mobject.height)
-        else:
-            mobject.scale(max_x / mobject.width)
-
     def create_worklist_table(
         self,
         variables: Collection[str],
@@ -734,7 +715,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     ) -> WorklistTable[L]:
         table = WorklistTable(variables, abstract_environments)
 
-        self.scale_mobject(
+        scale_mobject(
             table,
             self.camera.frame_width * 0.45,
             self.camera.frame_height * 0.55,
@@ -754,7 +735,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     ) -> ResTable[L]:
         res_table = ResTable(variables, res, res_cond)
 
-        self.scale_mobject(
+        scale_mobject(
             res_table,
             self.camera.frame_width * 0.45,
             self.camera.frame_height * 0.25,
@@ -769,7 +750,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
     def create_worklist_tex(self, worklist: set[ProgramPoint]) -> WorklistTex:
         worklist_tex = WorklistTex(worklist)
 
-        self.scale_mobject(
+        scale_mobject(
             worklist_tex,
             self.camera.frame_width * 0.45,
             self.camera.frame_height * 0.10,
@@ -838,7 +819,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     program_point=str(program_point.point)
                 )
             )
-            self.scale_mobject(
+            scale_mobject(
                 worklist_pop_title,
                 self.cfg_title_width,
                 self.cfg_title_height,
@@ -938,7 +919,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     variables=", ".join(variable for variable in res_variables)
                 )
             )
-            self.scale_mobject(
+            scale_mobject(
                 worklist_control_flow_variables_title,
                 self.cfg_title_width,
                 self.cfg_title_height,
@@ -985,7 +966,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                     ),
                 )
             )
-            self.scale_mobject(
+            scale_mobject(
                 worklist_table_variables_title,
                 self.cfg_title_width,
                 self.cfg_title_height,
@@ -1035,7 +1016,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                         successor_program_point=str(successor.point),
                     )
                 )
-                self.scale_mobject(
+                scale_mobject(
                     worklist_successor_title,
                     self.cfg_title_width,
                     self.cfg_title_height,
@@ -1122,7 +1103,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                         variables=", ".join(variable for variable in res_cond_variables)
                     )
                 )
-                self.scale_mobject(
+                scale_mobject(
                     worklist_condition_update_variables_title,
                     self.cfg_title_width,
                     self.cfg_title_height,
@@ -1174,7 +1155,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                         ),
                     )
                 )
-                self.scale_mobject(
+                scale_mobject(
                     worklist_res_variables_title,
                     self.cfg_title_width,
                     self.cfg_title_height,
@@ -1229,7 +1210,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                             successor_program_point=str(successor.point),
                         )
                     )
-                self.scale_mobject(
+                scale_mobject(
                     worklist_included_title,
                     self.cfg_title_width,
                     self.cfg_title_height,
@@ -1248,7 +1229,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                             program_point=str(successor.point)
                         )
                     )
-                    self.scale_mobject(
+                    scale_mobject(
                         worklist_joined_values_title,
                         self.cfg_title_width,
                         self.cfg_title_height,
@@ -1313,7 +1294,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                                 joined_abstract_value=joined_abstract_value,
                             )
                         )
-                        self.scale_mobject(
+                        scale_mobject(
                             lattice_join_title,
                             self.lattice_title_width,
                             self.lattice_title_height,
@@ -1371,7 +1352,7 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
                             program_point=str(successor.point)
                         )
                     )
-                    self.scale_mobject(
+                    scale_mobject(
                         worklist_add_successor_title,
                         self.cfg_title_width,
                         self.cfg_title_height,
