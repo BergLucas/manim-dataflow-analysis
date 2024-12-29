@@ -169,10 +169,6 @@ EX = TypeVar("EX", bound=dict[str, object])
 
 
 class WorklistListener(Protocol[L, E, EX]):
-    def create_extra_data(self) -> EX:
-        """Create the extra data that is passed through the worklist algorithm."""
-        return {}
-
     def before_worklist_creation(
         self,
         data: BeforeWorklistCreationDict[L],
@@ -288,9 +284,8 @@ def worklist_algorithm(
     entry_point: ProgramPoint,
     program_cfg: nx.DiGraph[ProgramPoint],
     listener: WorklistListener[L, E, EX],
+    extra_data: EX,
 ):
-    extra_data = listener.create_extra_data()
-
     data: BeforeWorklistCreationDict[L] = {
         "variables": variables.union(parameters),
         "abstract_environments": {

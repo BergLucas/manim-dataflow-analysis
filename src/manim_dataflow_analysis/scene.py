@@ -72,6 +72,12 @@ M = TypeVar("M", bound=Mobject | None)
 
 
 class WorklistExtraDataDict(TypedDict, Generic[L], total=False):
+    cfg: ControlFlowGraph
+    lattice_graph: LatticeGraph[L]
+    control_flow_function_tex: AbstractEnvironmentUpdateInstances
+    flow_function_tex: AbstractEnvironmentUpdateInstances | None
+    condition_update_function_tex: AbstractEnvironmentUpdateInstances
+
     table: WorklistTable[L]
     res_table: ResTable[L]
     worklist_tex: WorklistTex
@@ -109,7 +115,11 @@ class WorklistExtraDataDict(TypedDict, Generic[L], total=False):
     lattice_joined_part: VMobject
 
 
-class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
+class AbstractAnalysisScene(
+    MovingCameraScene,
+    WorklistListener[L, E, WorklistExtraDataDict[L]],
+    Generic[L, E],
+):
     # Title
     title: str = "Dataflow Analysis"
     title_width: float = fw(0.5)
@@ -824,797 +834,730 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         else:
             raise NotImplementedError("Unsupported camera type")
 
-    def create_worklist_listener(
+    def before_worklist_creation(
         self,
-        lattice_graph: LatticeGraph[L],
-        cfg: ControlFlowGraph,
-        control_flow_function_tex: AbstractEnvironmentUpdateInstances,
-        flow_function_tex: AbstractEnvironmentUpdateInstances | None,
-        condition_update_function_tex: AbstractEnvironmentUpdateInstances,
-    ) -> WorklistListener[L, E, WorklistExtraDataDict[L]]:
-        class WorklistAnimation:
+        data: BeforeWorklistCreationDict[L],
+        extra_data: WorklistExtraDataDict[L],
+    ):
+        pass
 
-            @classmethod
-            def create_extra_data(cls) -> WorklistExtraDataDict[L]:
-                return {}
+    def after_worklist_creation(
+        self,
+        data: AfterWorklistCreationDict[L],
+        extra_data: WorklistExtraDataDict[L],
+    ):
+        extra_data["table"] = self.create_worklist_table(
+            data["variables"],
+            data["abstract_environments"],
+        )
+        extra_data["res_table"] = self.create_res_table(data["variables"])
+        extra_data["worklist_tex"] = self.create_worklist_tex(data["worklist"])
 
-            @classmethod
-            def before_worklist_creation(
-                cls,
-                data: BeforeWorklistCreationDict[L],
-                extra_data: WorklistExtraDataDict[L],
-            ):
-                pass
+        self.play(
+            Create(extra_data["table"]),
+            Create(extra_data["res_table"]),
+            Create(extra_data["worklist_tex"]),
+        )
 
-            @classmethod
-            def after_worklist_creation(
-                cls,
-                data: AfterWorklistCreationDict[L],
-                extra_data: WorklistExtraDataDict[L],
-            ):
-                extra_data["table"] = self.create_worklist_table(
+    def before_iteration(
+        self,
+        data: AfterWorklistCreationDict[L],
+        extra_data: WorklistExtraDataDict[L],
+    ):
+        pass
+
+    def after_program_point_selection(
+        self,
+        data: AfterProgramPointSelectionDict[L],
+        extra_data: WorklistExtraDataDict[L],
+    ):
+        extra_data["worklist_pop_title"] = Text(
+            self.worklist_pop_title_template.format(
+                program_point=str(data["program_point"].point)
+            )
+        )
+        scale_mobject(
+            extra_data["worklist_pop_title"],
+            self.cfg_title_width,
+            self.cfg_title_height,
+        )
+        extra_data["worklist_pop_title"].move_to(self.cfg_title_position)
+
+        extra_data["worklist_program_point_rectangle"] = SurroundingRectangle(
+            extra_data["worklist_tex"].get_program_point_part(data["program_point"])
+        )
+
+        self.play(
+            Create(extra_data["worklist_pop_title"]),
+            Create(extra_data["worklist_program_point_rectangle"]),
+        )
+
+        extra_data["table_program_point_rectangle"] = None
+        extra_data["program_point_rectangle"] = None
+
+        with (
+            self.animate_mobject(
+                extra_data["worklist_tex"],
+                self.create_worklist_tex(data["worklist"]),
+            ) as (
+                worklist_animation,
+                extra_data["worklist_tex"],
+            ),
+            self.animate_mobject(
+                extra_data["program_point_rectangle"],
+                SurroundingRectangle(extra_data["cfg"][data["program_point"]]),
+            ) as (
+                program_point_animation,
+                extra_data["program_point_rectangle"],
+            ),
+            self.animate_mobject(
+                extra_data["table_program_point_rectangle"],
+                SurroundingRectangle(
+                    extra_data["table"].get_program_point_part(data["program_point"])
+                ),
+            ) as (
+                table_program_point_animation,
+                extra_data["table_program_point_rectangle"],
+            ),
+        ):
+            self.play(
+                Uncreate(extra_data["worklist_program_point_rectangle"]),
+                worklist_animation,
+                program_point_animation,
+                table_program_point_animation,
+            )
+
+        self.wait(self.worklist_pop_wait_time)
+
+        return extra_data
+
+    def after_control_flow_function_application(
+        self,
+        data: AfterControlFlowFunctionApplicationDict[L],
+        extra_data: WorklistExtraDataDict[L],
+    ):
+        if isinstance(data["res_instance_id"], int):
+            extra_data["control_flow_function_instance"] = extra_data[
+                "control_flow_function_tex"
+            ].get_instance_part(data["res_instance_id"])
+            extra_data["control_flow_function_result"] = extra_data[
+                "control_flow_function_tex"
+            ].get_modification_part(data["res_instance_id"])
+        else:
+            instance_id, flow_instance_id = data["res_instance_id"]
+            extra_data["control_flow_function_instance"] = extra_data[
+                "control_flow_function_tex"
+            ].get_instance_part(instance_id)
+            assert extra_data["flow_function_tex"] is not None
+            extra_data["control_flow_function_result"] = extra_data[
+                "flow_function_tex"
+            ].get_modification_part(flow_instance_id)
+
+        extra_data["program_point_label"] = (
+            extra_data["cfg"].labels[data["program_point"]].copy()
+        )
+        extra_data["program_point_label"].color = WHITE
+
+        self.add(
+            extra_data["control_flow_function_tex"], extra_data["flow_function_tex"]
+        )
+
+        self.play(
+            Uncreate(extra_data["worklist_pop_title"]),
+            Transform(
+                extra_data["program_point_label"],
+                extra_data["control_flow_function_instance"],
+            ),
+            self.move_camera_animation(self.control_flow_function_camera_position),
+        )
+        self.remove(extra_data["program_point_label"])
+
+        self.show_control_flow_function_instance(
+            extra_data["control_flow_function_tex"],
+            extra_data["flow_function_tex"],
+            data["res_instance_id"],
+            data["program_point"],
+        )
+
+        extra_data["worklist_control_flow_variables_title"] = Text(
+            self.worklist_control_flow_variables_title_template.format(
+                variables=", ".join(variable for variable in data["res_variables"])
+            )
+        )
+        scale_mobject(
+            extra_data["worklist_control_flow_variables_title"],
+            self.cfg_title_width,
+            self.cfg_title_height,
+        )
+        extra_data["worklist_control_flow_variables_title"].move_to(
+            self.cfg_title_position
+        )
+
+        with (
+            self.animate_mobject(
+                extra_data["res_table"],
+                self.create_res_table(
                     data["variables"],
-                    data["abstract_environments"],
-                )
-                extra_data["res_table"] = self.create_res_table(data["variables"])
-                extra_data["worklist_tex"] = self.create_worklist_tex(data["worklist"])
-
-                self.play(
-                    Create(extra_data["table"]),
-                    Create(extra_data["res_table"]),
-                    Create(extra_data["worklist_tex"]),
-                )
-
-                return extra_data
-
-            @classmethod
-            def before_iteration(
-                cls,
-                data: AfterWorklistCreationDict[L],
-                extra_data: WorklistExtraDataDict[L],
-            ):
-                pass
-
-            @classmethod
-            def after_program_point_selection(
-                cls,
-                data: AfterProgramPointSelectionDict[L],
-                extra_data: WorklistExtraDataDict[L],
-            ):
-                extra_data["worklist_pop_title"] = Text(
-                    self.worklist_pop_title_template.format(
-                        program_point=str(data["program_point"].point)
-                    )
-                )
-                scale_mobject(
-                    extra_data["worklist_pop_title"],
-                    self.cfg_title_width,
-                    self.cfg_title_height,
-                )
-                extra_data["worklist_pop_title"].move_to(self.cfg_title_position)
-
-                extra_data["worklist_program_point_rectangle"] = SurroundingRectangle(
-                    extra_data["worklist_tex"].get_program_point_part(
-                        data["program_point"]
-                    )
-                )
-
-                self.play(
-                    Create(extra_data["worklist_pop_title"]),
-                    Create(extra_data["worklist_program_point_rectangle"]),
-                )
-
-                extra_data["table_program_point_rectangle"] = None
-                extra_data["program_point_rectangle"] = None
-
-                with (
-                    self.animate_mobject(
-                        extra_data["worklist_tex"],
-                        self.create_worklist_tex(data["worklist"]),
-                    ) as (
-                        worklist_animation,
-                        extra_data["worklist_tex"],
+                    AbstractEnvironment(
+                        self.lattice,
+                        frozendict(data["res_variables"]),
                     ),
-                    self.animate_mobject(
-                        extra_data["program_point_rectangle"],
-                        SurroundingRectangle(cfg[data["program_point"]]),
-                    ) as (
-                        program_point_animation,
-                        extra_data["program_point_rectangle"],
-                    ),
-                    self.animate_mobject(
-                        extra_data["table_program_point_rectangle"],
-                        SurroundingRectangle(
-                            extra_data["table"].get_program_point_part(
-                                data["program_point"]
-                            )
-                        ),
-                    ) as (
-                        table_program_point_animation,
-                        extra_data["table_program_point_rectangle"],
-                    ),
-                ):
-                    self.play(
-                        Uncreate(extra_data["worklist_program_point_rectangle"]),
-                        worklist_animation,
-                        program_point_animation,
-                        table_program_point_animation,
-                    )
-
-                self.wait(self.worklist_pop_wait_time)
-
-                return extra_data
-
-            @classmethod
-            def after_control_flow_function_application(
-                cls,
-                data: AfterControlFlowFunctionApplicationDict[L],
-                extra_data: WorklistExtraDataDict[L],
-            ):
-                if isinstance(data["res_instance_id"], int):
-                    extra_data["control_flow_function_instance"] = (
-                        control_flow_function_tex.get_instance_part(
-                            data["res_instance_id"]
-                        )
-                    )
-                    extra_data["control_flow_function_result"] = (
-                        control_flow_function_tex.get_modification_part(
-                            data["res_instance_id"]
-                        )
-                    )
-                else:
-                    instance_id, flow_instance_id = data["res_instance_id"]
-                    extra_data["control_flow_function_instance"] = (
-                        control_flow_function_tex.get_instance_part(instance_id)
-                    )
-                    assert flow_function_tex is not None
-                    extra_data["control_flow_function_result"] = (
-                        flow_function_tex.get_modification_part(flow_instance_id)
-                    )
-
-                extra_data["program_point_label"] = cfg.labels[
-                    data["program_point"]
-                ].copy()
-                extra_data["program_point_label"].color = WHITE
-
-                self.add(control_flow_function_tex, flow_function_tex)
-
-                self.play(
-                    Uncreate(extra_data["worklist_pop_title"]),
-                    Transform(
-                        extra_data["program_point_label"],
-                        extra_data["control_flow_function_instance"],
-                    ),
-                    self.move_camera_animation(
-                        self.control_flow_function_camera_position
-                    ),
+                ),
+            ) as (res_table_animation, extra_data["res_table"]),
+        ):
+            res_parts = tuple(
+                (
+                    extra_data["control_flow_function_result"].copy(),
+                    extra_data["res_table"].get_res_variable_part(variable),
                 )
-                self.remove(extra_data["program_point_label"])
+                for variable in data["res_variables"]
+            )
+            self.play(
+                Create(extra_data["worklist_control_flow_variables_title"]),
+                self.move_camera_animation(self.worklist_camera_position),
+                res_table_animation,
+                *(Transform(*res_part) for res_part in res_parts),
+            )
+            self.remove(
+                extra_data["control_flow_function_tex"],
+                extra_data["flow_function_tex"],
+                *(part for part, _ in res_parts),
+            )
 
-                self.show_control_flow_function_instance(
-                    control_flow_function_tex,
-                    flow_function_tex,
-                    data["res_instance_id"],
-                    data["program_point"],
-                )
+        self.wait(self.worklist_control_flow_variables_wait_time)
 
-                extra_data["worklist_control_flow_variables_title"] = Text(
-                    self.worklist_control_flow_variables_title_template.format(
-                        variables=", ".join(
-                            variable for variable in data["res_variables"]
-                        )
-                    )
-                )
-                scale_mobject(
-                    extra_data["worklist_control_flow_variables_title"],
-                    self.cfg_title_width,
-                    self.cfg_title_height,
-                )
-                extra_data["worklist_control_flow_variables_title"].move_to(
-                    self.cfg_title_position
-                )
+        extra_data["worklist_table_variables_title"] = Text(
+            self.worklist_table_variables_title_template.format(
+                program_point=str(data["program_point"].point),
+                variables=", ".join(
+                    variable
+                    for variable in data["variables"]
+                    if variable not in data["res_variables"]
+                ),
+            )
+        )
+        scale_mobject(
+            extra_data["worklist_table_variables_title"],
+            self.cfg_title_width,
+            self.cfg_title_height,
+        )
+        extra_data["worklist_table_variables_title"].move_to(self.cfg_title_position)
 
-                with (
-                    self.animate_mobject(
-                        extra_data["res_table"],
-                        self.create_res_table(
-                            data["variables"],
-                            AbstractEnvironment(
-                                self.lattice, frozendict(data["res_variables"])
-                            ),
-                        ),
-                    ) as (res_table_animation, extra_data["res_table"]),
-                ):
-                    res_parts = tuple(
-                        (
-                            extra_data["control_flow_function_result"].copy(),
-                            extra_data["res_table"].get_res_variable_part(variable),
-                        )
-                        for variable in data["res_variables"]
-                    )
-                    self.play(
-                        Create(extra_data["worklist_control_flow_variables_title"]),
-                        self.move_camera_animation(self.worklist_camera_position),
-                        res_table_animation,
-                        *(Transform(*res_part) for res_part in res_parts),
-                    )
-                    self.remove(
-                        control_flow_function_tex,
-                        flow_function_tex,
-                        *(part for part, _ in res_parts),
-                    )
-
-                self.wait(self.worklist_control_flow_variables_wait_time)
-
-                extra_data["worklist_table_variables_title"] = Text(
-                    self.worklist_table_variables_title_template.format(
-                        program_point=str(data["program_point"].point),
-                        variables=", ".join(
-                            variable
-                            for variable in data["variables"]
-                            if variable not in data["res_variables"]
-                        ),
-                    )
-                )
-                scale_mobject(
-                    extra_data["worklist_table_variables_title"],
-                    self.cfg_title_width,
-                    self.cfg_title_height,
-                )
-                extra_data["worklist_table_variables_title"].move_to(
-                    self.cfg_title_position
-                )
-
-                with (
-                    self.animate_mobject(
-                        extra_data["res_table"],
-                        self.create_res_table(data["variables"], data["res"]),
-                    ) as (res_table_animation, extra_data["res_table"]),
-                ):
-                    control_flow_parts = tuple(
-                        (
-                            extra_data["table"]
-                            .get_variable_part(data["program_point"], variable)
-                            .copy(),
-                            extra_data["res_table"].get_res_variable_part(variable),
-                        )
-                        for variable in data["variables"]
-                        if variable not in data["res_variables"]
-                    )
-                    self.play(
-                        Transform(
-                            extra_data["worklist_control_flow_variables_title"],
-                            extra_data["worklist_table_variables_title"],
-                        ),
-                        res_table_animation,
-                        *(
-                            Transform(*control_flow_part)
-                            for control_flow_part in control_flow_parts
-                        ),
-                    )
-                    self.remove(*(part for part, _ in control_flow_parts))
-
-                self.add(extra_data["worklist_table_variables_title"])
-                self.remove(extra_data["worklist_control_flow_variables_title"])
-
-                self.wait(self.worklist_table_variables_wait_time)
-
-                self.play(Uncreate(extra_data["worklist_table_variables_title"]))
-
-                extra_data["table_successor_program_point_rectangle"] = None
-                extra_data["successor_program_point_rectangle"] = None
-
-            @classmethod
-            def before_successor_iteration(
-                cls,
-                data: BeforeSuccessorIterationDict[L],
-                extra_data: WorklistExtraDataDict[L],
-            ):
-                extra_data["worklist_successor_title"] = Text(
-                    self.worklist_successor_title_template.format(
-                        successor_program_point=str(data["successor"].point),
-                    )
-                )
-                scale_mobject(
-                    extra_data["worklist_successor_title"],
-                    self.cfg_title_width,
-                    self.cfg_title_height,
-                )
-                extra_data["worklist_successor_title"].move_to(self.cfg_title_position)
-
-                with (
-                    self.animate_mobject(
-                        extra_data["successor_program_point_rectangle"],
-                        SurroundingRectangle(cfg[data["successor"]], color=ORANGE),
-                    ) as (
-                        successor_program_point_animation,
-                        extra_data["successor_program_point_rectangle"],
-                    ),
-                    self.animate_mobject(
-                        extra_data["table_successor_program_point_rectangle"],
-                        SurroundingRectangle(
-                            extra_data["table"].get_program_point_part(
-                                data["successor"]
-                            ),
-                            color=ORANGE,
-                        ),
-                    ) as (
-                        table_successor_program_point_animation,
-                        extra_data["table_successor_program_point_rectangle"],
-                    ),
-                ):
-                    self.play(
-                        Create(extra_data["worklist_successor_title"]),
-                        successor_program_point_animation,
-                        table_successor_program_point_animation,
-                    )
-
-                self.wait(self.worklist_successor_wait_time)
-
-                self.play(Uncreate(extra_data["worklist_successor_title"]))
-
-            @classmethod
-            def after_condition_update_function_application(
-                cls,
-                data: AfterConditionUpdateFunctionApplicationDict[L, E],
-                extra_data: WorklistExtraDataDict[L],
-            ):
-                extra_data["program_point_label"] = cfg.labels[
-                    data["program_point"]
-                ].copy()
-                extra_data["program_point_label"].color = WHITE
-                extra_data["successor_program_point_label"] = cfg.labels[
-                    data["successor"]
-                ].copy()
-                extra_data["successor_program_point_label"].color = WHITE
-
-                extra_data["condition_update_function_instance"] = (
-                    condition_update_function_tex.get_instance_part(
-                        data["res_cond_instance_id"]
-                    )
-                )
-                extra_data["condition_update_function_result"] = (
-                    condition_update_function_tex.get_modification_part(
-                        data["res_cond_instance_id"]
-                    )
-                )
-
-                self.add(condition_update_function_tex)
-
-                self.play(
-                    Transform(
-                        extra_data["program_point_label"],
-                        extra_data["condition_update_function_instance"],
-                    ),
-                    Transform(
-                        extra_data["successor_program_point_label"],
-                        extra_data["condition_update_function_instance"],
-                    ),
-                    self.move_camera_animation(
-                        self.condition_update_function_camera_position
-                    ),
-                )
-                self.remove(
-                    extra_data["program_point_label"],
-                    extra_data["successor_program_point_label"],
-                )
-
-                self.show_condition_update_function_instance(
-                    condition_update_function_tex,
-                    data["res_cond_instance_id"],
-                    data["condition"],
-                )
-
-                extra_data["worklist_condition_update_variables_title"] = Text(
-                    self.worklist_condition_update_variables_title_template.format(
-                        variables=", ".join(
-                            variable for variable in data["res_cond_variables"]
-                        )
-                    )
-                )
-                scale_mobject(
-                    extra_data["worklist_condition_update_variables_title"],
-                    self.cfg_title_width,
-                    self.cfg_title_height,
-                )
-                extra_data["worklist_condition_update_variables_title"].move_to(
-                    self.cfg_title_position
-                )
-
-                with (
-                    self.animate_mobject(
-                        extra_data["res_table"],
-                        self.create_res_table(
-                            data["variables"],
-                            data["res"],
-                            AbstractEnvironment(
-                                self.lattice, frozendict(data["res_cond_variables"])
-                            ),
-                        ),
-                    ) as (res_cond_table_animation, extra_data["res_table"]),
-                ):
-                    res_cond_parts = tuple(
-                        (
-                            extra_data["condition_update_function_result"].copy(),
-                            extra_data["res_table"].get_res_cond_variable_part(
-                                variable
-                            ),
-                        )
-                        for variable in data["res_cond_variables"]
-                    )
-                    self.play(
-                        Create(extra_data["worklist_condition_update_variables_title"]),
-                        self.move_camera_animation(self.worklist_camera_position),
-                        res_cond_table_animation,
-                        *(
-                            Transform(*res_cond_part)
-                            for res_cond_part in res_cond_parts
-                        ),
-                    )
-                    self.remove(*(part for part, _ in res_cond_parts))
-
-                self.remove(condition_update_function_tex)
-
-                self.wait(self.worklist_condition_update_variables_wait_time)
-
-                extra_data["worklist_res_variables_title"] = Text(
-                    self.worklist_res_variables_title_template.format(
-                        variables=", ".join(
-                            variable
-                            for variable in data["variables"]
-                            if variable not in data["res_cond_variables"]
-                        ),
-                    )
-                )
-                scale_mobject(
-                    extra_data["worklist_res_variables_title"],
-                    self.cfg_title_width,
-                    self.cfg_title_height,
-                )
-                extra_data["worklist_res_variables_title"].move_to(
-                    self.cfg_title_position
-                )
-
-                with (
-                    self.animate_mobject(
-                        extra_data["res_table"],
-                        self.create_res_table(
-                            data["variables"],
-                            data["res"],
-                            data["res_cond"],
-                        ),
-                    ) as (res_cond_table_animation, extra_data["res_table"]),
-                ):
-                    condition_update_parts = tuple(
-                        (
-                            extra_data["res_table"]
-                            .get_res_variable_part(variable)
-                            .copy(),
-                            extra_data["res_table"].get_res_cond_variable_part(
-                                variable
-                            ),
-                        )
-                        for variable in data["variables"]
-                        if variable not in data["res_cond_variables"]
-                    )
-                    self.play(
-                        Transform(
-                            extra_data["worklist_condition_update_variables_title"],
-                            extra_data["worklist_res_variables_title"],
-                        ),
-                        res_cond_table_animation,
-                        *(
-                            Transform(*condition_update_part)
-                            for condition_update_part in condition_update_parts
-                        ),
-                    )
-                    self.remove(*(part for part, _ in condition_update_parts))
-
-                self.add(extra_data["worklist_res_variables_title"])
-                self.remove(extra_data["worklist_condition_update_variables_title"])
-
-                self.wait(self.worklist_res_variables_wait_time)
-
-                self.play(Uncreate(extra_data["worklist_res_variables_title"]))
-
-            @classmethod
-            def after_included(
-                cls,
-                data: AfterIncludedDict[L, E],
-                extra_data: WorklistExtraDataDict[L],
-            ):
-                if data["included"]:
-                    extra_data["worklist_included_title"] = Text(
-                        self.worklist_is_included_title_template.format(
-                            successor_program_point=str(data["successor"].point)
-                        )
-                    )
-                else:
-                    extra_data["worklist_included_title"] = Text(
-                        self.worklist_not_included_title_template.format(
-                            successor_program_point=str(data["successor"].point),
-                        )
-                    )
-                scale_mobject(
-                    extra_data["worklist_included_title"],
-                    self.cfg_title_width,
-                    self.cfg_title_height,
-                )
-                extra_data["worklist_included_title"].move_to(self.cfg_title_position)
-
-                self.play(Create(extra_data["worklist_included_title"]))
-
-                self.wait(self.worklist_included_wait_time)
-
-                self.play(Uncreate(extra_data["worklist_included_title"]))
-
-            @classmethod
-            def after_not_included(
-                cls,
-                data: AfterIncludedDict[L, E],
-                extra_data: WorklistExtraDataDict[L],
-            ):
-                extra_data["worklist_joined_values_title"] = Text(
-                    self.worklist_joined_values_title_template.format(
-                        program_point=str(data["successor"].point)
-                    )
-                )
-                scale_mobject(
-                    extra_data["worklist_joined_values_title"],
-                    self.cfg_title_width,
-                    self.cfg_title_height,
-                )
-                extra_data["worklist_joined_values_title"].move_to(
-                    self.cfg_title_position
-                )
-
-                self.play(Create(extra_data["worklist_joined_values_title"]))
-
-                self.wait(self.worklist_joined_values_wait_time)
-
-            @classmethod
-            def while_join(
-                cls,
-                data: WhileJoinDict[L, E],
-                extra_data: WorklistExtraDataDict[L],
-            ):
-                extra_data["new_lattice_graph"] = self.create_lattice_graph(
-                    {
-                        data["current_abstract_value"],
-                        data["successor_abstract_value"],
-                        data["joined_abstract_value"],
-                    }
-                )
-
-                self.add(lattice_graph)
-                self.play(FadeTransform(lattice_graph, extra_data["new_lattice_graph"]))
-
-                extra_data["new_lattice_graph"].color_path(
-                    data["current_abstract_value"], data["joined_abstract_value"]
-                )
-                extra_data["new_lattice_graph"].color_path(
-                    data["successor_abstract_value"], data["joined_abstract_value"]
-                )
-
-                self.add(extra_data["new_lattice_graph"])
-                self.remove(lattice_graph)
-
-                extra_data["successor_program_point_part"] = (
+        with (
+            self.animate_mobject(
+                extra_data["res_table"],
+                self.create_res_table(data["variables"], data["res"]),
+            ) as (res_table_animation, extra_data["res_table"]),
+        ):
+            control_flow_parts = tuple(
+                (
                     extra_data["table"]
-                    .get_variable_part(data["successor"], data["variable"])
-                    .copy()
+                    .get_variable_part(data["program_point"], variable)
+                    .copy(),
+                    extra_data["res_table"].get_res_variable_part(variable),
                 )
-                extra_data["res_cond_part"] = (
-                    extra_data["res_table"]
-                    .get_res_cond_variable_part(data["variable"])
-                    .copy()
-                )
+                for variable in data["variables"]
+                if variable not in data["res_variables"]
+            )
+            self.play(
+                Transform(
+                    extra_data["worklist_control_flow_variables_title"],
+                    extra_data["worklist_table_variables_title"],
+                ),
+                res_table_animation,
+                *(
+                    Transform(*control_flow_part)
+                    for control_flow_part in control_flow_parts
+                ),
+            )
+            self.remove(*(part for part, _ in control_flow_parts))
 
-                extra_data["lattice_res_cond_part"] = extra_data[
-                    "new_lattice_graph"
-                ].labels[data["current_abstract_value"]]
-                extra_data["lattice_successor_part"] = extra_data[
-                    "new_lattice_graph"
-                ].labels[data["successor_abstract_value"]]
+        self.add(extra_data["worklist_table_variables_title"])
+        self.remove(extra_data["worklist_control_flow_variables_title"])
 
-                extra_data["lattice_join_title"] = Text(
-                    self.lattice_join_title_template.format(
-                        abstract_value1=data["current_abstract_value"],
-                        abstract_value2=data["successor_abstract_value"],
-                        joined_abstract_value=data["joined_abstract_value"],
-                    )
-                )
-                scale_mobject(
-                    extra_data["lattice_join_title"],
-                    self.lattice_title_width,
-                    self.lattice_title_height,
-                )
-                extra_data["lattice_join_title"].move_to(self.lattice_title_position)
+        self.wait(self.worklist_table_variables_wait_time)
 
-                self.play(
-                    Create(extra_data["lattice_join_title"]),
-                    Transform(
-                        extra_data["successor_program_point_part"],
-                        extra_data["lattice_successor_part"],
+        self.play(Uncreate(extra_data["worklist_table_variables_title"]))
+
+        extra_data["table_successor_program_point_rectangle"] = None
+        extra_data["successor_program_point_rectangle"] = None
+
+    def before_successor_iteration(
+        self,
+        data: BeforeSuccessorIterationDict[L],
+        extra_data: WorklistExtraDataDict[L],
+    ):
+        extra_data["worklist_successor_title"] = Text(
+            self.worklist_successor_title_template.format(
+                successor_program_point=str(data["successor"].point),
+            )
+        )
+        scale_mobject(
+            extra_data["worklist_successor_title"],
+            self.cfg_title_width,
+            self.cfg_title_height,
+        )
+        extra_data["worklist_successor_title"].move_to(self.cfg_title_position)
+
+        with (
+            self.animate_mobject(
+                extra_data["successor_program_point_rectangle"],
+                SurroundingRectangle(
+                    extra_data["cfg"][data["successor"]],
+                    color=ORANGE,
+                ),
+            ) as (
+                successor_program_point_animation,
+                extra_data["successor_program_point_rectangle"],
+            ),
+            self.animate_mobject(
+                extra_data["table_successor_program_point_rectangle"],
+                SurroundingRectangle(
+                    extra_data["table"].get_program_point_part(data["successor"]),
+                    color=ORANGE,
+                ),
+            ) as (
+                table_successor_program_point_animation,
+                extra_data["table_successor_program_point_rectangle"],
+            ),
+        ):
+            self.play(
+                Create(extra_data["worklist_successor_title"]),
+                successor_program_point_animation,
+                table_successor_program_point_animation,
+            )
+
+        self.wait(self.worklist_successor_wait_time)
+
+        self.play(Uncreate(extra_data["worklist_successor_title"]))
+
+    def after_condition_update_function_application(
+        self,
+        data: AfterConditionUpdateFunctionApplicationDict[L, E],
+        extra_data: WorklistExtraDataDict[L],
+    ):
+        extra_data["program_point_label"] = (
+            extra_data["cfg"].labels[data["program_point"]].copy()
+        )
+        extra_data["program_point_label"].color = WHITE
+        extra_data["successor_program_point_label"] = (
+            extra_data["cfg"].labels[data["successor"]].copy()
+        )
+        extra_data["successor_program_point_label"].color = WHITE
+
+        extra_data["condition_update_function_instance"] = extra_data[
+            "condition_update_function_tex"
+        ].get_instance_part(data["res_cond_instance_id"])
+        extra_data["condition_update_function_result"] = extra_data[
+            "condition_update_function_tex"
+        ].get_modification_part(data["res_cond_instance_id"])
+
+        self.add(extra_data["condition_update_function_tex"])
+
+        self.play(
+            Transform(
+                extra_data["program_point_label"],
+                extra_data["condition_update_function_instance"],
+            ),
+            Transform(
+                extra_data["successor_program_point_label"],
+                extra_data["condition_update_function_instance"],
+            ),
+            self.move_camera_animation(self.condition_update_function_camera_position),
+        )
+        self.remove(
+            extra_data["program_point_label"],
+            extra_data["successor_program_point_label"],
+        )
+
+        self.show_condition_update_function_instance(
+            extra_data["condition_update_function_tex"],
+            data["res_cond_instance_id"],
+            data["condition"],
+        )
+
+        extra_data["worklist_condition_update_variables_title"] = Text(
+            self.worklist_condition_update_variables_title_template.format(
+                variables=", ".join(variable for variable in data["res_cond_variables"])
+            )
+        )
+        scale_mobject(
+            extra_data["worklist_condition_update_variables_title"],
+            self.cfg_title_width,
+            self.cfg_title_height,
+        )
+        extra_data["worklist_condition_update_variables_title"].move_to(
+            self.cfg_title_position
+        )
+
+        with (
+            self.animate_mobject(
+                extra_data["res_table"],
+                self.create_res_table(
+                    data["variables"],
+                    data["res"],
+                    AbstractEnvironment(
+                        self.lattice,
+                        frozendict(data["res_cond_variables"]),
                     ),
-                    Transform(
-                        extra_data["res_cond_part"],
-                        extra_data["lattice_res_cond_part"],
-                    ),
-                    self.move_camera_animation(self.lattice_camera_position),
+                ),
+            ) as (res_cond_table_animation, extra_data["res_table"]),
+        ):
+            res_cond_parts = tuple(
+                (
+                    extra_data["condition_update_function_result"].copy(),
+                    extra_data["res_table"].get_res_cond_variable_part(variable),
                 )
+                for variable in data["res_cond_variables"]
+            )
+            self.play(
+                Create(extra_data["worklist_condition_update_variables_title"]),
+                self.move_camera_animation(self.worklist_camera_position),
+                res_cond_table_animation,
+                *(Transform(*res_cond_part) for res_cond_part in res_cond_parts),
+            )
+            self.remove(*(part for part, _ in res_cond_parts))
 
-                self.remove(
-                    extra_data["successor_program_point_part"],
-                    extra_data["res_cond_part"],
+        self.remove(extra_data["condition_update_function_tex"])
+
+        self.wait(self.worklist_condition_update_variables_wait_time)
+
+        extra_data["worklist_res_variables_title"] = Text(
+            self.worklist_res_variables_title_template.format(
+                variables=", ".join(
+                    variable
+                    for variable in data["variables"]
+                    if variable not in data["res_cond_variables"]
+                ),
+            )
+        )
+        scale_mobject(
+            extra_data["worklist_res_variables_title"],
+            self.cfg_title_width,
+            self.cfg_title_height,
+        )
+        extra_data["worklist_res_variables_title"].move_to(self.cfg_title_position)
+
+        with (
+            self.animate_mobject(
+                extra_data["res_table"],
+                self.create_res_table(
+                    data["variables"],
+                    data["res"],
+                    data["res_cond"],
+                ),
+            ) as (res_cond_table_animation, extra_data["res_table"]),
+        ):
+            condition_update_parts = tuple(
+                (
+                    extra_data["res_table"].get_res_variable_part(variable).copy(),
+                    extra_data["res_table"].get_res_cond_variable_part(variable),
                 )
+                for variable in data["variables"]
+                if variable not in data["res_cond_variables"]
+            )
+            self.play(
+                Transform(
+                    extra_data["worklist_condition_update_variables_title"],
+                    extra_data["worklist_res_variables_title"],
+                ),
+                res_cond_table_animation,
+                *(
+                    Transform(*condition_update_part)
+                    for condition_update_part in condition_update_parts
+                ),
+            )
+            self.remove(*(part for part, _ in condition_update_parts))
 
-                self.wait(self.lattice_join_wait_time)
+        self.add(extra_data["worklist_res_variables_title"])
+        self.remove(extra_data["worklist_condition_update_variables_title"])
 
-                extra_data["lattice_joined_part"] = (
-                    extra_data["new_lattice_graph"]
-                    .labels[data["joined_abstract_value"]]
-                    .copy()
+        self.wait(self.worklist_res_variables_wait_time)
+
+        self.play(Uncreate(extra_data["worklist_res_variables_title"]))
+
+    def after_included(
+        self,
+        data: AfterIncludedDict[L, E],
+        extra_data: WorklistExtraDataDict[L],
+    ):
+        if data["included"]:
+            extra_data["worklist_included_title"] = Text(
+                self.worklist_is_included_title_template.format(
+                    successor_program_point=str(data["successor"].point)
                 )
+            )
+        else:
+            extra_data["worklist_included_title"] = Text(
+                self.worklist_not_included_title_template.format(
+                    successor_program_point=str(data["successor"].point),
+                )
+            )
+        scale_mobject(
+            extra_data["worklist_included_title"],
+            self.cfg_title_width,
+            self.cfg_title_height,
+        )
+        extra_data["worklist_included_title"].move_to(self.cfg_title_position)
 
-                with (
-                    self.animate_mobject(
-                        extra_data["table"],
-                        self.create_worklist_table(
-                            data["variables"], data["abstract_environments"]
-                        ),
-                    ) as (
-                        table_animation,
-                        extra_data["table"],
-                    ),
-                ):
-                    self.play(
-                        Uncreate(extra_data["lattice_join_title"]),
-                        Transform(
-                            extra_data["lattice_joined_part"],
-                            extra_data["table"].get_variable_part(
-                                data["successor"], data["variable"]
-                            ),
-                        ),
-                        self.move_camera_animation(self.worklist_camera_position),
-                        table_animation,
-                    )
+        self.play(Create(extra_data["worklist_included_title"]))
 
-                self.remove(
+        self.wait(self.worklist_included_wait_time)
+
+        self.play(Uncreate(extra_data["worklist_included_title"]))
+
+    def after_not_included(
+        self,
+        data: AfterIncludedDict[L, E],
+        extra_data: WorklistExtraDataDict[L],
+    ):
+        extra_data["worklist_joined_values_title"] = Text(
+            self.worklist_joined_values_title_template.format(
+                program_point=str(data["successor"].point)
+            )
+        )
+        scale_mobject(
+            extra_data["worklist_joined_values_title"],
+            self.cfg_title_width,
+            self.cfg_title_height,
+        )
+        extra_data["worklist_joined_values_title"].move_to(self.cfg_title_position)
+
+        self.play(Create(extra_data["worklist_joined_values_title"]))
+
+        self.wait(self.worklist_joined_values_wait_time)
+
+    def while_join(
+        self,
+        data: WhileJoinDict[L, E],
+        extra_data: WorklistExtraDataDict[L],
+    ):
+        extra_data["new_lattice_graph"] = self.create_lattice_graph(
+            {
+                data["current_abstract_value"],
+                data["successor_abstract_value"],
+                data["joined_abstract_value"],
+            }
+        )
+
+        self.add(extra_data["lattice_graph"])
+        self.play(
+            FadeTransform(extra_data["lattice_graph"], extra_data["new_lattice_graph"])
+        )
+
+        extra_data["new_lattice_graph"].color_path(
+            data["current_abstract_value"], data["joined_abstract_value"]
+        )
+        extra_data["new_lattice_graph"].color_path(
+            data["successor_abstract_value"], data["joined_abstract_value"]
+        )
+
+        self.add(extra_data["new_lattice_graph"])
+        self.remove(extra_data["lattice_graph"])
+
+        extra_data["successor_program_point_part"] = (
+            extra_data["table"]
+            .get_variable_part(data["successor"], data["variable"])
+            .copy()
+        )
+        extra_data["res_cond_part"] = (
+            extra_data["res_table"].get_res_cond_variable_part(data["variable"]).copy()
+        )
+
+        extra_data["lattice_res_cond_part"] = extra_data["new_lattice_graph"].labels[
+            data["current_abstract_value"]
+        ]
+        extra_data["lattice_successor_part"] = extra_data["new_lattice_graph"].labels[
+            data["successor_abstract_value"]
+        ]
+
+        extra_data["lattice_join_title"] = Text(
+            self.lattice_join_title_template.format(
+                abstract_value1=data["current_abstract_value"],
+                abstract_value2=data["successor_abstract_value"],
+                joined_abstract_value=data["joined_abstract_value"],
+            )
+        )
+        scale_mobject(
+            extra_data["lattice_join_title"],
+            self.lattice_title_width,
+            self.lattice_title_height,
+        )
+        extra_data["lattice_join_title"].move_to(self.lattice_title_position)
+
+        self.play(
+            Create(extra_data["lattice_join_title"]),
+            Transform(
+                extra_data["successor_program_point_part"],
+                extra_data["lattice_successor_part"],
+            ),
+            Transform(
+                extra_data["res_cond_part"],
+                extra_data["lattice_res_cond_part"],
+            ),
+            self.move_camera_animation(self.lattice_camera_position),
+        )
+
+        self.remove(
+            extra_data["successor_program_point_part"],
+            extra_data["res_cond_part"],
+        )
+
+        self.wait(self.lattice_join_wait_time)
+
+        extra_data["lattice_joined_part"] = (
+            extra_data["new_lattice_graph"].labels[data["joined_abstract_value"]].copy()
+        )
+
+        with (
+            self.animate_mobject(
+                extra_data["table"],
+                self.create_worklist_table(
+                    data["variables"], data["abstract_environments"]
+                ),
+            ) as (
+                table_animation,
+                extra_data["table"],
+            ),
+        ):
+            self.play(
+                Uncreate(extra_data["lattice_join_title"]),
+                Transform(
                     extra_data["lattice_joined_part"],
-                    extra_data["new_lattice_graph"],
+                    extra_data["table"].get_variable_part(
+                        data["successor"], data["variable"]
+                    ),
+                ),
+                self.move_camera_animation(self.worklist_camera_position),
+                table_animation,
+            )
+
+        self.remove(
+            extra_data["lattice_joined_part"],
+            extra_data["new_lattice_graph"],
+        )
+
+    def after_join(
+        self,
+        data: AfterIncludedDict[L, E],
+        extra_data: WorklistExtraDataDict[L],
+    ):
+        self.play(Uncreate(extra_data["worklist_joined_values_title"]))
+
+    def after_add(
+        self,
+        data: AfterIncludedDict[L, E],
+        extra_data: WorklistExtraDataDict[L],
+    ):
+        extra_data["worklist_add_successor_title"] = Text(
+            self.worklist_add_successor_title_template.format(
+                program_point=str(data["successor"].point)
+            )
+        )
+        scale_mobject(
+            extra_data["worklist_add_successor_title"],
+            self.cfg_title_width,
+            self.cfg_title_height,
+        )
+        extra_data["worklist_add_successor_title"].move_to(self.cfg_title_position)
+
+        with (
+            self.animate_mobject(
+                extra_data["worklist_tex"],
+                self.create_worklist_tex(data["worklist"]),
+            ) as (
+                worklist_animation,
+                extra_data["worklist_tex"],
+            ),
+        ):
+            self.play(
+                Create(extra_data["worklist_add_successor_title"]),
+                worklist_animation,
+            )
+
+        self.wait(self.worklist_add_successor_wait_time)
+
+        self.play(Uncreate(extra_data["worklist_add_successor_title"]))
+
+    def after_successor_iteration(
+        self,
+        data: AfterIncludedDict[L, E],
+        extra_data: WorklistExtraDataDict[L],
+    ):
+        with (
+            self.animate_mobject(
+                extra_data["res_table"],
+                self.create_res_table(data["variables"], data["res"]),
+            ) as (
+                res_table_animation,
+                extra_data["res_table"],
+            ),
+        ):
+            self.play(res_table_animation)
+
+    def after_iteration(
+        self,
+        data: AfterControlFlowFunctionApplicationDict[L],
+        extra_data: WorklistExtraDataDict[L],
+    ):
+        with (
+            self.animate_mobject(
+                extra_data["res_table"],
+                self.create_res_table(data["variables"]),
+            ) as (
+                res_table_animation,
+                extra_data["res_table"],
+            ),
+            self.animate_mobject(
+                extra_data["program_point_rectangle"],
+                None,
+            ) as (
+                program_point_animation,
+                extra_data["program_point_rectangle"],
+            ),
+            self.animate_mobject(
+                extra_data["table_program_point_rectangle"],
+                None,
+            ) as (
+                table_program_point_animation,
+                extra_data["table_program_point_rectangle"],
+            ),
+            self.animate_mobject(
+                extra_data["successor_program_point_rectangle"],
+                None,
+            ) as (
+                successor_program_point_animation,
+                extra_data["successor_program_point_rectangle"],
+            ),
+            self.animate_mobject(
+                extra_data["table_successor_program_point_rectangle"],
+                None,
+            ) as (
+                table_successor_program_point_animation,
+                extra_data["table_successor_program_point_rectangle"],
+            ),
+        ):
+            if (
+                successor_program_point_animation is not None
+                and table_successor_program_point_animation is not None
+            ):
+                self.play(
+                    successor_program_point_animation,
+                    table_successor_program_point_animation,
                 )
 
-            @classmethod
-            def after_join(
-                cls,
-                data: AfterIncludedDict[L, E],
-                extra_data: WorklistExtraDataDict[L],
-            ):
-                self.play(Uncreate(extra_data["worklist_joined_values_title"]))
+            self.play(
+                res_table_animation,
+                program_point_animation,
+                table_program_point_animation,
+            )
 
-            @classmethod
-            def after_add(
-                cls,
-                data: AfterIncludedDict[L, E],
-                extra_data: WorklistExtraDataDict[L],
-            ):
-                extra_data["worklist_add_successor_title"] = Text(
-                    self.worklist_add_successor_title_template.format(
-                        program_point=str(data["successor"].point)
-                    )
-                )
-                scale_mobject(
-                    extra_data["worklist_add_successor_title"],
-                    self.cfg_title_width,
-                    self.cfg_title_height,
-                )
-                extra_data["worklist_add_successor_title"].move_to(
-                    self.cfg_title_position
-                )
-
-                with (
-                    self.animate_mobject(
-                        extra_data["worklist_tex"],
-                        self.create_worklist_tex(data["worklist"]),
-                    ) as (
-                        worklist_animation,
-                        extra_data["worklist_tex"],
-                    ),
-                ):
-                    self.play(
-                        Create(extra_data["worklist_add_successor_title"]),
-                        worklist_animation,
-                    )
-
-                self.wait(self.worklist_add_successor_wait_time)
-
-                self.play(Uncreate(extra_data["worklist_add_successor_title"]))
-
-            @classmethod
-            def after_successor_iteration(
-                cls,
-                data: AfterIncludedDict[L, E],
-                extra_data: WorklistExtraDataDict[L],
-            ):
-                with (
-                    self.animate_mobject(
-                        extra_data["res_table"],
-                        self.create_res_table(data["variables"], data["res"]),
-                    ) as (
-                        res_table_animation,
-                        extra_data["res_table"],
-                    ),
-                ):
-                    self.play(res_table_animation)
-
-            @classmethod
-            def after_iteration(
-                cls,
-                data: AfterControlFlowFunctionApplicationDict[L],
-                extra_data: WorklistExtraDataDict[L],
-            ):
-                with (
-                    self.animate_mobject(
-                        extra_data["res_table"],
-                        self.create_res_table(data["variables"]),
-                    ) as (
-                        res_table_animation,
-                        extra_data["res_table"],
-                    ),
-                    self.animate_mobject(
-                        extra_data["program_point_rectangle"],
-                        None,
-                    ) as (
-                        program_point_animation,
-                        extra_data["program_point_rectangle"],
-                    ),
-                    self.animate_mobject(
-                        extra_data["table_program_point_rectangle"],
-                        None,
-                    ) as (
-                        table_program_point_animation,
-                        extra_data["table_program_point_rectangle"],
-                    ),
-                    self.animate_mobject(
-                        extra_data["successor_program_point_rectangle"],
-                        None,
-                    ) as (
-                        successor_program_point_animation,
-                        extra_data["successor_program_point_rectangle"],
-                    ),
-                    self.animate_mobject(
-                        extra_data["table_successor_program_point_rectangle"],
-                        None,
-                    ) as (
-                        table_successor_program_point_animation,
-                        extra_data["table_successor_program_point_rectangle"],
-                    ),
-                ):
-                    if (
-                        successor_program_point_animation is not None
-                        and table_successor_program_point_animation is not None
-                    ):
-                        self.play(
-                            successor_program_point_animation,
-                            table_successor_program_point_animation,
-                        )
-
-                    self.play(
-                        res_table_animation,
-                        program_point_animation,
-                        table_program_point_animation,
-                    )
-
-            @classmethod
-            def after_worklist_algorithm(
-                cls,
-                data: AfterWorklistCreationDict[L],
-                extra_data: WorklistExtraDataDict[L],
-            ):
-                self.wait(self.worklist_wait_time)
-
-        return WorklistAnimation
+    def after_worklist_algorithm(
+        self,
+        data: AfterWorklistCreationDict[L],
+        extra_data: WorklistExtraDataDict[L],
+    ):
+        self.wait(self.worklist_wait_time)
 
     def worklist(
         self,
@@ -1626,14 +1569,6 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
         flow_function_tex: AbstractEnvironmentUpdateInstances | None,
         condition_update_function_tex: AbstractEnvironmentUpdateInstances,
     ):
-        listener = self.create_worklist_listener(
-            lattice_graph,
-            cfg,
-            control_flow_function_tex,
-            flow_function_tex,
-            condition_update_function_tex,
-        )
-
         worklist_algorithm(
             self.program.parameters,
             self.program.variables,
@@ -1642,7 +1577,14 @@ class AbstractAnalysisScene(MovingCameraScene, Generic[L, E]):
             self.condition_update_function,
             entry_point,
             program_cfg,
-            listener,
+            self,
+            {
+                "cfg": cfg,
+                "lattice_graph": lattice_graph,
+                "control_flow_function_tex": control_flow_function_tex,
+                "flow_function_tex": flow_function_tex,
+                "condition_update_function_tex": condition_update_function_tex,
+            },
         )
 
     def construct(self):
