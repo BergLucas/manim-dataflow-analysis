@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Iterable, TypeVar, Protocol, Sequence, Generator
+from typing import TYPE_CHECKING, Generator, Iterable, Protocol, Sequence, TypeVar
 
 from manim.mobject.text.tex_mobject import MathTex
-from manim.mobject.types.vectorized_mobject import VMobject
-from manim_dataflow_analysis.abstract_environment import AbstractEnvironment
+
+if TYPE_CHECKING:
+    from manim.mobject.types.vectorized_mobject import VMobject
+
+    from manim_dataflow_analysis.abstract_environment import AbstractEnvironment
 
 L = TypeVar("L")
 
@@ -42,14 +45,16 @@ class WideningOperatorTex(MathTex):
 class WideningOperator(Protocol[L]):
     @property
     @abstractmethod
-    def instances(self) -> Sequence[tuple[str, str]]: ...
+    def instances(self) -> Sequence[tuple[str, str]]:
+        ...
 
     @abstractmethod
     def apply(
         self,
         last_value: L,
         new_value: L,
-    ) -> tuple[L, int]: ...
+    ) -> tuple[L, int]:
+        ...
 
     def join_generator(
         self,

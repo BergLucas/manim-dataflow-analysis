@@ -1,20 +1,35 @@
 from __future__ import annotations
 
-from typing import Collection, Generic, Mapping, Set, TypeVar, Protocol, TypedDict
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Collection,
+    Generic,
+    Mapping,
+    Protocol,
+    Set,
+    TypedDict,
+    TypeVar,
+    cast,
+)
 
+from frozendict import frozendict
 from manim.mobject.table import MobjectTable
 from manim.mobject.text.tex_mobject import MathTex
 from manim.mobject.text.text_mobject import Text
 
 from manim_dataflow_analysis.abstract_environment import AbstractEnvironment
-from manim_dataflow_analysis.cfg import ProgramPoint, succ, cond
-from manim_dataflow_analysis.lattice import Lattice
-from manim_dataflow_analysis.flow_function import ControlFlowFunction
-from manim_dataflow_analysis.condition_update_function import ConditionUpdateFunction
-from manim_dataflow_analysis.widening_operator import WideningOperator
+from manim_dataflow_analysis.cfg import ProgramPoint, cond, succ
 
-from frozendict import frozendict
-import networkx as nx
+if TYPE_CHECKING:
+    import networkx as nx
+
+    from manim_dataflow_analysis.condition_update_function import (
+        ConditionUpdateFunction,
+    )
+    from manim_dataflow_analysis.flow_function import ControlFlowFunction
+    from manim_dataflow_analysis.lattice import Lattice
+    from manim_dataflow_analysis.widening_operator import WideningOperator
 
 L = TypeVar("L")
 E = TypeVar("E")
@@ -125,12 +140,12 @@ class ResTable(MobjectTable, Generic[L]):
 
 
 class BeforeWorklistCreationDict(TypedDict, Generic[L]):
-    variables: Set[str]
-    abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]]
+    variables: set[str]
+    abstract_environments: dict[ProgramPoint, AbstractEnvironment[L]]
 
 
 class AfterWorklistCreationDict(BeforeWorklistCreationDict[L]):
-    worklist: Set[ProgramPoint]
+    worklist: set[ProgramPoint]
 
 
 class AfterProgramPointSelectionDict(AfterWorklistCreationDict[L]):
@@ -139,8 +154,8 @@ class AfterProgramPointSelectionDict(AfterWorklistCreationDict[L]):
 
 class AfterControlFlowFunctionApplicationDict(AfterProgramPointSelectionDict[L]):
     res: AbstractEnvironment[L]
-    res_variables: Mapping[str, L]
-    res_instance_id: int
+    res_variables: dict[str, L]
+    res_instance_id: int | tuple[int, int]
 
 
 class BeforeSuccessorIterationDict(AfterControlFlowFunctionApplicationDict[L]):
@@ -152,7 +167,7 @@ class AfterConditionUpdateFunctionApplicationDict(
 ):
     condition: E
     res_cond: AbstractEnvironment[L] | None
-    res_cond_variables: Mapping[str, L] | None
+    res_cond_variables: dict[str, L] | None
     res_cond_instance_id: int
 
 
@@ -175,126 +190,126 @@ class WhileWidenDict(AfterIncludedDict[L, E]):
     widened_instance_id: int
 
 
-EX = TypeVar("EX", bound=dict[str, object])
+EX_contra = TypeVar("EX_contra", contravariant=True, bound=dict[str, Any])
 
 
-class WorklistListener(Protocol[L, E, EX]):
+class WorklistListener(Protocol[L, E, EX_contra]):
     def before_worklist_creation(
         self,
         data: BeforeWorklistCreationDict[L],
-        extra_data: EX,
+        extra_data: EX_contra,
     ) -> None:
         """Called before the worklist is created."""
 
     def after_worklist_creation(
         self,
         data: AfterWorklistCreationDict[L],
-        extra_data: EX,
+        extra_data: EX_contra,
     ) -> None:
         """Called after the worklist is created."""
 
     def before_iteration(
         self,
         data: AfterWorklistCreationDict[L],
-        extra_data: EX,
+        extra_data: EX_contra,
     ) -> None:
         """Called before an iteration of the worklist algorithm."""
 
     def after_program_point_selection(
         self,
         data: AfterProgramPointSelectionDict[L],
-        extra_data: EX,
+        extra_data: EX_contra,
     ) -> None:
         """Called after a program point is selected from the worklist."""
 
     def after_control_flow_function_application(
         self,
         data: AfterControlFlowFunctionApplicationDict[L],
-        extra_data: EX,
+        extra_data: EX_contra,
     ) -> None:
         """Called after the control flow function is applied."""
 
     def before_successor_iteration(
         self,
         data: BeforeSuccessorIterationDict[L],
-        extra_data: EX,
+        extra_data: EX_contra,
     ) -> None:
         """Called before a successor is processed."""
 
     def after_condition_update_function_application(
         self,
         data: AfterConditionUpdateFunctionApplicationDict[L, E],
-        extra_data: EX,
+        extra_data: EX_contra,
     ) -> None:
         """Called after the condition update function is applied."""
 
     def after_unreachable_code(
         self,
         data: AfterConditionUpdateFunctionApplicationDict[L, E],
-        extra_data: EX,
+        extra_data: EX_contra,
     ) -> None:
         """Called after the condition update function detects unreachable code."""
 
     def after_included(
         self,
         data: AfterIncludedDict[L, E],
-        extra_data: EX,
+        extra_data: EX_contra,
     ) -> None:
-        """Called after the res_cond abstract environment is included in the successor abstract environment."""
+        """Called after the res_cond abstract environment is included in the successor abstract environment."""  # noqa: E501
 
     def after_not_included(
         self,
         data: AfterIncludedDict[L, E],
-        extra_data: EX,
+        extra_data: EX_contra,
     ) -> None:
-        """Called after the res_cond abstract environment is not included in the successor abstract environment."""
+        """Called after the res_cond abstract environment is not included in the successor abstract environment."""  # noqa: E501
 
     def while_join(
         self,
         data: WhileJoinDict[L, E],
-        extra_data: EX,
+        extra_data: EX_contra,
     ) -> None:
         """Called while the join operation is applied."""
 
     def after_join(
         self,
         data: AfterIncludedDict[L, E],
-        extra_data: EX,
+        extra_data: EX_contra,
     ) -> None:
         """Called after the join operation is applied."""
 
     def while_widen(
         self,
         data: WhileWidenDict[L, E],
-        extra_data: EX,
+        extra_data: EX_contra,
     ) -> None:
         """Called while the widening operation is applied."""
 
     def after_add(
         self,
         data: AfterIncludedDict[L, E],
-        extra_data: EX,
+        extra_data: EX_contra,
     ) -> None:
         """Called after a successor is added to the worklist."""
 
     def after_successor_iteration(
         self,
-        data: AfterIncludedDict[L, E],
-        extra_data: EX,
+        data: AfterConditionUpdateFunctionApplicationDict[L, E],
+        extra_data: EX_contra,
     ) -> None:
         """Called after a successor is processed."""
 
     def after_iteration(
         self,
         data: AfterControlFlowFunctionApplicationDict[L],
-        extra_data: EX,
+        extra_data: EX_contra,
     ) -> None:
         """Called after an iteration of the worklist algorithm."""
 
     def after_worklist_algorithm(
         self,
         data: AfterWorklistCreationDict[L],
-        extra_data: EX,
+        extra_data: EX_contra,
     ) -> None:
         """Called after the worklist algorithm is finished."""
 
@@ -308,8 +323,8 @@ def worklist_algorithm(
     condition_update_function: ConditionUpdateFunction[L, E],
     entry_point: ProgramPoint,
     program_cfg: nx.DiGraph[ProgramPoint],
-    listener: WorklistListener[L, E, EX],
-    extra_data: EX,
+    listener: WorklistListener[L, E, EX_contra],
+    extra_data: EX_contra,
 ):
     data: BeforeWorklistCreationDict[L] = {
         "variables": variables.union(parameters),
@@ -329,7 +344,7 @@ def worklist_algorithm(
 
     listener.before_worklist_creation(data, extra_data)
 
-    data: BeforeWorklistCreationDict[L] | AfterWorklistCreationDict[L]
+    data = cast(AfterWorklistCreationDict[L], data)
 
     data["worklist"] = {entry_point}
 
@@ -338,42 +353,35 @@ def worklist_algorithm(
     while data["worklist"]:
         listener.before_iteration(data, extra_data)
 
-        data: AfterWorklistCreationDict[L] | AfterProgramPointSelectionDict[L]
+        data = cast(AfterProgramPointSelectionDict[L], data)
 
         data["program_point"] = data["worklist"].pop()
 
         listener.after_program_point_selection(data, extra_data)
 
-        data: (
-            AfterProgramPointSelectionDict[L]
-            | AfterControlFlowFunctionApplicationDict[L]
-        )
+        data = cast(AfterControlFlowFunctionApplicationDict[L], data)
 
         (
             data["res"],
-            data["res_variables"],
+            res_variables,
             data["res_instance_id"],
         ) = control_flow_function.apply_and_get_variables(
             data["program_point"],
             data["abstract_environments"][data["program_point"]],
         )
 
+        data["res_variables"] = dict(res_variables)
+
         listener.after_control_flow_function_application(data, extra_data)
 
         for successor in succ(program_cfg, data["program_point"]):
-            data: (
-                AfterControlFlowFunctionApplicationDict[L]
-                | BeforeSuccessorIterationDict[L]
-            )
+            data = cast(BeforeSuccessorIterationDict[L], data)
 
             data["successor"] = successor
 
             listener.before_successor_iteration(data, extra_data)
 
-            data: (
-                BeforeSuccessorIterationDict[L]
-                | AfterConditionUpdateFunctionApplicationDict[L, E]
-            )
+            data = cast(AfterConditionUpdateFunctionApplicationDict[L, E], data)
 
             data["condition"] = cond(
                 program_cfg,
@@ -383,26 +391,32 @@ def worklist_algorithm(
 
             (
                 data["res_cond"],
-                data["res_cond_variables"],
+                res_cond_variables,
                 data["res_cond_instance_id"],
             ) = condition_update_function.apply_and_get_variables(
                 data["condition"],
                 data["res"],
             )
 
-            listener.after_condition_update_function_application(data, extra_data)
-
-            data: (
-                AfterConditionUpdateFunctionApplicationDict[L, E]
-                | AfterIncludedDict[L, E]
+            data["res_cond_variables"] = (
+                None if res_cond_variables is None else dict(res_cond_variables)
             )
+
+            listener.after_condition_update_function_application(data, extra_data)
 
             if data["res_cond"] is None:
                 listener.after_unreachable_code(data, extra_data)
             else:
+                assert data["res_cond"] is not None
+                assert data["res_cond_variables"] is not None
+
+                data = cast(AfterIncludedDict[L, E], data)
+
                 data["included"] = data["abstract_environments"][
-                    data["successor"]
-                ].includes(data["res_cond"])
+                    data["successor"]  # type: ignore
+                ].includes(
+                    data["res_cond"]  # type: ignore
+                )
 
                 listener.after_included(data, extra_data)
 
@@ -412,12 +426,16 @@ def worklist_algorithm(
                     if widening_operator is None:
                         for variable, joined_abstract_value in data[
                             "abstract_environments"
-                        ][data["successor"]].join_generator(data["res_cond"]):
-                            data: AfterIncludedDict[L, E] | WhileJoinDict[L, E]
+                        ][
+                            data["successor"]  # type: ignore
+                        ].join_generator(
+                            data["res_cond"]  # type: ignore
+                        ):
+                            data = cast(WhileJoinDict[L, E], data)
 
                             data["variable"] = variable
                             data["joined_abstract_value"] = joined_abstract_value
-                            data["current_abstract_value"] = data["res_cond"][
+                            data["current_abstract_value"] = data["res_cond"][  # type: ignore
                                 data["variable"]
                             ]
                             data["successor_abstract_value"] = data[
@@ -438,14 +456,14 @@ def worklist_algorithm(
                             widened_instance_id,
                         ) in widening_operator.join_generator(
                             data["abstract_environments"][data["successor"]],
-                            data["res_cond"],
+                            data["res_cond"],  # type: ignore
                         ):
-                            data: AfterIncludedDict[L, E] | WhileWidenDict[L, E]
+                            data = cast(WhileWidenDict[L, E], data)
 
                             data["variable"] = variable
                             data["widened_abstract_value"] = widened_abstract_value
                             data["widened_instance_id"] = widened_instance_id
-                            data["current_abstract_value"] = data["res_cond"][
+                            data["current_abstract_value"] = data["res_cond"][  # type: ignore
                                 data["variable"]
                             ]
                             data["successor_abstract_value"] = data[

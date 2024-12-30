@@ -1,5 +1,5 @@
-from manim.mobject.mobject import Mobject
 from manim import config
+from manim.mobject.mobject import Mobject
 
 
 def scale_mobject(mobject: Mobject, max_x: float, max_y: float) -> None:

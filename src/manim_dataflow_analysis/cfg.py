@@ -8,7 +8,7 @@ import networkx as nx
 import numpy as np
 from manim.mobject.geometry.arc import TipableVMobject
 from manim.mobject.text.tex_mobject import SingleStringMathTex, Tex
-from manim.utils.color import BLACK, GREEN, RED, WHITE
+from manim.utils.color import BLACK, GREEN, RED
 
 from manim_dataflow_analysis.graph import BetterDiGraph, LabeledRectangle
 
@@ -58,19 +58,26 @@ class PathArrow(TipableVMobject):
 
 
 class GraphNode(Protocol):
-    def get_center(self) -> Point3D: ...
+    def get_center(self) -> Point3D:
+        ...
 
-    def get_top(self) -> Point3D: ...
+    def get_top(self) -> Point3D:
+        ...
 
-    def get_bottom(self) -> Point3D: ...
+    def get_bottom(self) -> Point3D:
+        ...
 
-    def get_right(self) -> Point3D: ...
+    def get_right(self) -> Point3D:
+        ...
 
-    def get_left(self) -> Point3D: ...
+    def get_left(self) -> Point3D:
+        ...
 
-    def get_zenith(self) -> Point3D: ...
+    def get_zenith(self) -> Point3D:
+        ...
 
-    def get_nadir(self) -> Point3D: ...
+    def get_nadir(self) -> Point3D:
+        ...
 
 
 class EdgeLayoutFunction(Protocol):
@@ -79,7 +86,8 @@ class EdgeLayoutFunction(Protocol):
         vertices: dict[Hashable, GraphNode],
         start: Hashable,
         end: Hashable,
-    ) -> list[Point3D]: ...
+    ) -> list[Point3D]:
+        ...
 
 
 def default_edge_layout(
@@ -97,10 +105,8 @@ class LayoutAndEdgeLayoutFunction(Protocol):
         scale: float | tuple[float, float, float] = 2,
         *args: Any,
         **kwargs: Any,
-    ) -> tuple[
-        dict[Hashable, Point3D],
-        EdgeLayoutFunction,
-    ]: ...
+    ) -> tuple[dict[Hashable, Point3D], EdgeLayoutFunction,]:
+        ...
 
 
 def __cfg_successors(
@@ -311,10 +317,7 @@ def cfg_layout(
     scale: float | tuple[float, float, float] = 2,
     condition_vertices: dict[Hashable, tuple[Hashable]] | None = None,
     vertex_spacing: tuple[float, float] = (1, 1),
-) -> tuple[
-    dict[Hashable, Point3D],
-    EdgeLayoutFunction,
-]:
+) -> tuple[dict[Hashable, Point3D], EdgeLayoutFunction,]:
     if condition_vertices is None:
         raise ValueError("The CFG layout requires the condition vertices to be passed")
 

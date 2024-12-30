@@ -10,14 +10,16 @@ E_contra = TypeVar("E_contra", contravariant=True)
 class ConditionUpdateFunction(Protocol[L, E_contra]):
     @property
     @abstractmethod
-    def instances(self) -> Sequence[tuple[str, str, str | None]]: ...
+    def instances(self) -> Sequence[tuple[str, str, str | None]]:
+        ...
 
     @abstractmethod
     def get_variables(
         self,
         expression: E_contra,
         abstract_environment: AbstractEnvironment[L],
-    ) -> tuple[Mapping[str, L] | None, int]: ...
+    ) -> tuple[Mapping[str, L] | None, int]:
+        ...
 
     def apply(
         self,

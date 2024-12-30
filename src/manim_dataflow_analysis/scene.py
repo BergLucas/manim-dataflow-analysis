@@ -9,8 +9,8 @@ from typing import (
     Generic,
     Hashable,
     Iterable,
-    TypeVar,
     TypedDict,
+    TypeVar,
 )
 
 from frozendict import frozendict
@@ -26,10 +26,6 @@ from manim.renderer.opengl_renderer import OpenGLCamera
 from manim.scene.zoomed_scene import MovingCameraScene
 from manim.utils.color import ORANGE, WHITE
 
-from manim_dataflow_analysis.widening_operator import (
-    WideningOperator,
-    WideningOperatorTex,
-)
 from manim_dataflow_analysis.abstract_environment import (
     AbstractEnvironment,
     AbstractEnvironmentUpdateInstances,
@@ -40,29 +36,33 @@ from manim_dataflow_analysis.lattice import (
     LatticeGraph,
     default_sorting_function,
 )
+from manim_dataflow_analysis.scale import fh, fw, scale_mobject
+from manim_dataflow_analysis.widening_operator import (
+    WideningOperator,
+    WideningOperatorTex,
+)
 from manim_dataflow_analysis.worklist import (
-    ResTable,
-    WorklistTable,
-    WorklistTex,
-    BeforeWorklistCreationDict,
-    AfterWorklistCreationDict,
-    AfterProgramPointSelectionDict,
-    AfterControlFlowFunctionApplicationDict,
-    BeforeSuccessorIterationDict,
     AfterConditionUpdateFunctionApplicationDict,
+    AfterControlFlowFunctionApplicationDict,
     AfterIncludedDict,
+    AfterProgramPointSelectionDict,
+    AfterWorklistCreationDict,
+    BeforeSuccessorIterationDict,
+    BeforeWorklistCreationDict,
+    ResTable,
     WhileJoinDict,
     WhileWidenDict,
     WorklistListener,
+    WorklistTable,
+    WorklistTex,
     worklist_algorithm,
 )
-from manim_dataflow_analysis.scale import fh, fw, scale_mobject
 
 if TYPE_CHECKING:
     import networkx as nx
     from manim.animation.animation import Animation
-    from manim.mobject.types.vectorized_mobject import VMobject
     from manim.mobject.text.tex_mobject import SingleStringMathTex, Tex
+    from manim.mobject.types.vectorized_mobject import VMobject
 
     from manim_dataflow_analysis.ast import AstFunction, AstStatement
     from manim_dataflow_analysis.condition_update_function import (
@@ -79,7 +79,7 @@ M = TypeVar("M", bound=Mobject | None)
 class WorklistExtraDataDict(TypedDict, Generic[L], total=False):
     cfg: ControlFlowGraph
     lattice_graph: LatticeGraph[L]
-    widening_operator_tex: WideningOperatorTex[L]
+    widening_operator_tex: WideningOperatorTex
     control_flow_function_tex: AbstractEnvironmentUpdateInstances
     flow_function_tex: AbstractEnvironmentUpdateInstances | None
     condition_update_function_tex: AbstractEnvironmentUpdateInstances
@@ -97,7 +97,6 @@ class WorklistExtraDataDict(TypedDict, Generic[L], total=False):
     control_flow_function_result: VMobject
     program_point_label: SingleStringMathTex | Text | Tex
     worklist_control_flow_variables_title: Text
-    res_table: ResTable[L]
     worklist_table_variables_title: Text
     table_successor_program_point_rectangle: SurroundingRectangle | None
     successor_program_point_rectangle: SurroundingRectangle | None
@@ -128,7 +127,7 @@ class WorklistExtraDataDict(TypedDict, Generic[L], total=False):
 
 class AbstractAnalysisScene(
     MovingCameraScene,
-    WorklistListener[L, E, WorklistExtraDataDict[L]],
+    WorklistListener[L, E, WorklistExtraDataDict[L]],  # type: ignore
     Generic[L, E],
 ):
     # Title
@@ -150,15 +149,13 @@ class AbstractAnalysisScene(
     lattice_position: tuple[float, float, float] = (fw(1), fh(-0.0775), 0)
     lattice_camera_position: tuple[float, float, float] = (fw(1), 0, 0)
     lattice_wait_time: float = 5.0
-    lattice_join_title_template: str = (
-        "We join {abstract_value1} and {abstract_value2} which results in {joined_abstract_value}"  # noqa: E501
-    )
+    lattice_join_title_template: str = "We join {abstract_value1} and {abstract_value2} which results in {joined_abstract_value}"  # noqa: E501
     lattice_join_wait_time: float = 5.0
     lattice_max_horizontal_size_per_vertex: int = 8
     lattice_max_vertical_size: int = 8
-    sorting_function: Callable[[Iterable[Hashable]], list[Hashable]] = (
-        default_sorting_function
-    )
+    sorting_function: Callable[
+        [Iterable[Hashable]], list[Hashable]
+    ] = default_sorting_function
 
     # Widening operator
     widening_operator: WideningOperator[L] | None = None
@@ -177,9 +174,7 @@ class AbstractAnalysisScene(
     widening_operator_position: tuple[float, float, float] = (fw(1), fh(-1.0775), 0)
     widening_operator_camera_position: tuple[float, float, float] = (fw(1), fh(-1), 0)
     widening_operator_wait_time: float = 5.0
-    widening_operator_widen_title_template: str = (
-        "We apply the widening operator on {last_value} and {new_value} which results in {widened_abstract_value}"  # noqa: E501
-    )
+    widening_operator_widen_title_template: str = "We apply the widening operator on {last_value} and {new_value} which results in {widened_abstract_value}"  # noqa: E501
     widening_operator_widen_highlight_wait_time: float = 2.5
     widening_operator_widen_set_time: float = 2.5
 
@@ -284,42 +279,24 @@ class AbstractAnalysisScene(
     worklist_pop_title_template: str = (
         "We remove the program point {program_point} from the worklist :"
     )
-    worklist_control_flow_function_title_template: str = (
-        "We use the control-flow function on our program point {program_point} which is the statement {statement} :"  # noqa: E501
-    )
+    worklist_control_flow_function_title_template: str = "We use the control-flow function on our program point {program_point} which is the statement {statement} :"  # noqa: E501
     worklist_flow_function_title_template: str = (
         "We use the flow function on our statement {statement} :"
     )
     worklist_condition_update_function_title_template: str = (
         "We use the condition update function on our condition {condition} :"
     )
-    worklist_control_flow_variables_title_template: str = (
-        "We update the res abstract environment with the variables\n{variables} coming from the control flow function :"  # noqa: E501
-    )
-    worklist_table_variables_title_template: str = (
-        "We update the rest of the res abstract environment with the variables\n{variables} coming from the abstract environment {program_point} :"  # noqa: E501
-    )
-    worklist_successor_title_template: str = (
-        "We try to check if we need to process the successor {successor_program_point} :"  # noqa: E501
-    )
+    worklist_control_flow_variables_title_template: str = "We update the res abstract environment with the variables\n{variables} coming from the control flow function :"  # noqa: E501
+    worklist_table_variables_title_template: str = "We update the rest of the res abstract environment with the variables\n{variables} coming from the abstract environment {program_point} :"  # noqa: E501
+    worklist_successor_title_template: str = "We try to check if we need to process the successor {successor_program_point} :"  # noqa: E501
     worklist_unreachable_title_template: str = (
         "We found the unreachable successor {successor_program_point} so we skip it :"
     )
-    worklist_condition_update_variables_title_template: str = (
-        "We update the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the condition update function :"  # noqa: E501
-    )
-    worklist_res_variables_title_template: str = (
-        "We update the rest of the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the res abstract environment :"  # noqa: E501
-    )
-    worklist_is_included_title_template: str = (
-        "res[COND(p,p')] is included in the abstract environment {successor_program_point}\nso we reached a fixed point :"  # noqa: E501
-    )
-    worklist_not_included_title_template: str = (
-        "res[COND(p,p')] is not included in the abstract environment {successor_program_point}\nso we must process the successor {successor_program_point} :"  # noqa: E501
-    )
-    worklist_joined_values_title_template: str = (
-        "We join the values from the abstract environment res[COND(p,p')] with\nthe abstract environment {program_point} :"  # noqa: E501
-    )
+    worklist_condition_update_variables_title_template: str = "We update the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the condition update function :"  # noqa: E501
+    worklist_res_variables_title_template: str = "We update the rest of the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the res abstract environment :"  # noqa: E501
+    worklist_is_included_title_template: str = "res[COND(p,p')] is included in the abstract environment {successor_program_point}\nso we reached a fixed point :"  # noqa: E501
+    worklist_not_included_title_template: str = "res[COND(p,p')] is not included in the abstract environment {successor_program_point}\nso we must process the successor {successor_program_point} :"  # noqa: E501
+    worklist_joined_values_title_template: str = "We join the values from the abstract environment res[COND(p,p')] with\nthe abstract environment {program_point} :"  # noqa: E501
     worklist_add_successor_title_template: str = (
         "We add the successor {program_point} to the worklist :"
     )
@@ -392,7 +369,7 @@ class AbstractAnalysisScene(
 
         return lattice_graph
 
-    def show_widening_operator(self) -> WideningOperatorTex[L]:
+    def show_widening_operator(self) -> WideningOperatorTex:
         widening_operator_title = Text(self.widening_operator_title)
 
         scale_mobject(
@@ -1408,19 +1385,19 @@ class AbstractAnalysisScene(
         data: AfterIncludedDict[L, E],
         extra_data: WorklistExtraDataDict[L],
     ):
-        extra_data["worklist_joined_values_title"] = Text(
+        extra_data["worklist_joined_values_title"] = Text(  # type: ignore
             self.worklist_joined_values_title_template.format(
                 program_point=str(data["successor"].point)
             )
         )
         scale_mobject(
-            extra_data["worklist_joined_values_title"],
+            extra_data["worklist_joined_values_title"],  # type: ignore
             self.cfg_title_width,
             self.cfg_title_height,
         )
-        extra_data["worklist_joined_values_title"].move_to(self.cfg_title_position)
+        extra_data["worklist_joined_values_title"].move_to(self.cfg_title_position)  # type: ignore
 
-        self.play(Create(extra_data["worklist_joined_values_title"]))
+        self.play(Create(extra_data["worklist_joined_values_title"]))  # type: ignore
 
         self.wait(self.worklist_joined_values_wait_time)
 
@@ -1429,7 +1406,7 @@ class AbstractAnalysisScene(
         data: WhileJoinDict[L, E],
         extra_data: WorklistExtraDataDict[L],
     ):
-        extra_data["new_lattice_graph"] = self.create_lattice_graph(
+        extra_data["new_lattice_graph"] = self.create_lattice_graph(  # type: ignore
             {
                 data["current_abstract_value"],
                 data["successor_abstract_value"],
@@ -1437,34 +1414,37 @@ class AbstractAnalysisScene(
             }
         )
 
-        self.add(extra_data["lattice_graph"])
+        self.add(extra_data["lattice_graph"])  # type: ignore
         self.play(
-            FadeTransform(extra_data["lattice_graph"], extra_data["new_lattice_graph"])
+            FadeTransform(
+                extra_data["lattice_graph"],  # type: ignore
+                extra_data["new_lattice_graph"],  # type: ignore
+            )
         )
 
-        extra_data["new_lattice_graph"].color_path(
+        extra_data["new_lattice_graph"].color_path(  # type: ignore
             data["current_abstract_value"], data["joined_abstract_value"]
         )
-        extra_data["new_lattice_graph"].color_path(
+        extra_data["new_lattice_graph"].color_path(  # type: ignore
             data["successor_abstract_value"], data["joined_abstract_value"]
         )
 
         self.add(extra_data["new_lattice_graph"])
         self.remove(extra_data["lattice_graph"])
 
-        extra_data["successor_program_point_part"] = (
-            extra_data["table"]
+        extra_data["successor_program_point_part"] = (  # type: ignore
+            extra_data["table"]  # type: ignore
             .get_variable_part(data["successor"], data["variable"])
             .copy()
         )
-        extra_data["res_cond_part"] = (
+        extra_data["res_cond_part"] = (  # type: ignore
             extra_data["res_table"].get_res_cond_variable_part(data["variable"]).copy()
         )
 
-        extra_data["lattice_res_cond_part"] = extra_data["new_lattice_graph"].labels[
+        extra_data["lattice_res_cond_part"] = extra_data["new_lattice_graph"].labels[  # type: ignore
             data["current_abstract_value"]
         ]
-        extra_data["lattice_successor_part"] = extra_data["new_lattice_graph"].labels[
+        extra_data["lattice_successor_part"] = extra_data["new_lattice_graph"].labels[  # type: ignore
             data["successor_abstract_value"]
         ]
 
@@ -1645,55 +1625,55 @@ class AbstractAnalysisScene(
         data: AfterIncludedDict[L, E],
         extra_data: WorklistExtraDataDict[L],
     ):
-        self.play(Uncreate(extra_data["worklist_joined_values_title"]))
+        self.play(Uncreate(extra_data["worklist_joined_values_title"]))  # type: ignore
 
     def after_add(
         self,
         data: AfterIncludedDict[L, E],
         extra_data: WorklistExtraDataDict[L],
     ):
-        extra_data["worklist_add_successor_title"] = Text(
+        extra_data["worklist_add_successor_title"] = Text(  # type: ignore
             self.worklist_add_successor_title_template.format(
                 program_point=str(data["successor"].point)
             )
         )
         scale_mobject(
-            extra_data["worklist_add_successor_title"],
+            extra_data["worklist_add_successor_title"],  # type: ignore
             self.cfg_title_width,
             self.cfg_title_height,
         )
-        extra_data["worklist_add_successor_title"].move_to(self.cfg_title_position)
+        extra_data["worklist_add_successor_title"].move_to(self.cfg_title_position)  # type: ignore
 
         with (
             self.animate_mobject(
-                extra_data["worklist_tex"],
+                extra_data["worklist_tex"],  # type: ignore
                 self.create_worklist_tex(data["worklist"]),
             ) as (
                 worklist_animation,
-                extra_data["worklist_tex"],
+                extra_data["worklist_tex"],  # type: ignore
             ),
         ):
             self.play(
-                Create(extra_data["worklist_add_successor_title"]),
+                Create(extra_data["worklist_add_successor_title"]),  # type: ignore
                 worklist_animation,
             )
 
         self.wait(self.worklist_add_successor_wait_time)
 
-        self.play(Uncreate(extra_data["worklist_add_successor_title"]))
+        self.play(Uncreate(extra_data["worklist_add_successor_title"]))  # type: ignore
 
     def after_successor_iteration(
         self,
-        data: AfterIncludedDict[L, E],
+        data: AfterConditionUpdateFunctionApplicationDict[L, E],
         extra_data: WorklistExtraDataDict[L],
     ):
         with (
             self.animate_mobject(
-                extra_data["res_table"],
+                extra_data["res_table"],  # type: ignore
                 self.create_res_table(data["variables"], data["res"]),
             ) as (
                 res_table_animation,
-                extra_data["res_table"],
+                extra_data["res_table"],  # type: ignore
             ),
         ):
             self.play(res_table_animation)
@@ -1705,39 +1685,39 @@ class AbstractAnalysisScene(
     ):
         with (
             self.animate_mobject(
-                extra_data["res_table"],
+                extra_data["res_table"],  # type: ignore
                 self.create_res_table(data["variables"]),
             ) as (
                 res_table_animation,
-                extra_data["res_table"],
+                extra_data["res_table"],  # type: ignore
             ),
             self.animate_mobject(
-                extra_data["program_point_rectangle"],
+                extra_data["program_point_rectangle"],  # type: ignore
                 None,
             ) as (
                 program_point_animation,
-                extra_data["program_point_rectangle"],
+                extra_data["program_point_rectangle"],  # type: ignore
             ),
             self.animate_mobject(
-                extra_data["table_program_point_rectangle"],
+                extra_data["table_program_point_rectangle"],  # type: ignore
                 None,
             ) as (
                 table_program_point_animation,
-                extra_data["table_program_point_rectangle"],
+                extra_data["table_program_point_rectangle"],  # type: ignore
             ),
             self.animate_mobject(
-                extra_data["successor_program_point_rectangle"],
+                extra_data["successor_program_point_rectangle"],  # type: ignore
                 None,
             ) as (
                 successor_program_point_animation,
-                extra_data["successor_program_point_rectangle"],
+                extra_data["successor_program_point_rectangle"],  # type: ignore
             ),
             self.animate_mobject(
-                extra_data["table_successor_program_point_rectangle"],
+                extra_data["table_successor_program_point_rectangle"],  # type: ignore
                 None,
             ) as (
                 table_successor_program_point_animation,
-                extra_data["table_successor_program_point_rectangle"],
+                extra_data["table_successor_program_point_rectangle"],  # type: ignore
             ),
         ):
             if (
@@ -1774,10 +1754,10 @@ class AbstractAnalysisScene(
         condition_update_function_tex: AbstractEnvironmentUpdateInstances,
     ):
         worklist_algorithm(
-            self.program.parameters,
+            set(self.program.parameters),
             self.program.variables,
-            self.lattice,
-            self.widening_operator,
+            self.lattice,  # type: ignore
+            self.widening_operator,  # type: ignore
             self.control_flow_function,
             self.condition_update_function,
             entry_point,
