@@ -1755,7 +1755,7 @@ class AbstractAnalysisScene(
     ):
         worklist_algorithm(
             set(self.program.parameters),
-            self.program.variables,
+            set(self.program.variables),
             self.lattice,  # type: ignore
             self.widening_operator,  # type: ignore
             self.control_flow_function,

@@ -54,7 +54,7 @@ class AstFunction(Protocol):
 
     @property
     @abstractmethod
-    def variables(self) -> set[str]:
+    def variables(self) -> frozenset[str]:
         """Get the variable names used in the AST program.
 
         Returns:
