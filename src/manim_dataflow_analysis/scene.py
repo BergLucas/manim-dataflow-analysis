@@ -127,7 +127,7 @@ class WorklistExtraDataDict(TypedDict, Generic[L], total=False):
 
 class AbstractAnalysisScene(
     MovingCameraScene,
-    WorklistListener[L, E, WorklistExtraDataDict[L]],  # type: ignore
+    WorklistListener[L, E, WorklistExtraDataDict[L]],
     Generic[L, E],
 ):
     # Title

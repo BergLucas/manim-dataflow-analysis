@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import (
     TYPE_CHECKING,
-    Any,
     Collection,
     Generic,
     Mapping,
@@ -190,7 +189,7 @@ class WhileWidenDict(AfterIncludedDict[L, E]):
     widened_instance_id: int
 
 
-EX_contra = TypeVar("EX_contra", contravariant=True, bound=dict[str, Any])
+EX_contra = TypeVar("EX_contra", contravariant=True)
 
 
 class WorklistListener(Protocol[L, E, EX_contra]):
@@ -329,7 +328,7 @@ def worklist_algorithm(
     data: BeforeWorklistCreationDict[L] = {
         "variables": variables.union(parameters),
         "abstract_environments": {
-            p: AbstractEnvironment(
+            entry_point: AbstractEnvironment(
                 lattice,
                 frozendict(
                     (
@@ -338,7 +337,17 @@ def worklist_algorithm(
                     )
                 ),
             )
+        }
+        | {
+            p: AbstractEnvironment(
+                lattice,
+                frozendict(
+                    (variable, lattice.bottom())
+                    for variable in variables.union(parameters)
+                ),
+            )
             for p in program_cfg.nodes
+            if p != entry_point
         },
     }
 
@@ -490,4 +499,4 @@ def worklist_algorithm(
 
     listener.after_worklist_algorithm(data, extra_data)
 
-    return data, extra_data
+    return data["abstract_environments"]
