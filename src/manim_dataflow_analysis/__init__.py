@@ -5,6 +5,7 @@ from manim_dataflow_analysis.condition_update_function import ConditionUpdateFun
 from manim_dataflow_analysis.flow_function import ControlFlowFunction, FlowFunction
 from manim_dataflow_analysis.lattice import FiniteSizeLattice, Lattice
 from manim_dataflow_analysis.scene import AbstractAnalysisScene
+from manim_dataflow_analysis.widening_operator import WideningOperator
 
 __all__ = [
     "AbstractEnvironment",
@@ -17,4 +18,5 @@ __all__ = [
     "FlowFunction",
     "ControlFlowFunction",
     "AbstractAnalysisScene",
+    "WideningOperator",
 ]

@@ -26,6 +26,10 @@ from manim.renderer.opengl_renderer import OpenGLCamera
 from manim.scene.zoomed_scene import MovingCameraScene
 from manim.utils.color import ORANGE, WHITE
 
+from manim_dataflow_analysis.widening_operator import (
+    WideningOperator,
+    WideningOperatorTex,
+)
 from manim_dataflow_analysis.abstract_environment import (
     AbstractEnvironment,
     AbstractEnvironmentUpdateInstances,
@@ -48,6 +52,7 @@ from manim_dataflow_analysis.worklist import (
     AfterConditionUpdateFunctionApplicationDict,
     AfterIncludedDict,
     WhileJoinDict,
+    WhileWidenDict,
     WorklistListener,
     worklist_algorithm,
 )
@@ -74,6 +79,7 @@ M = TypeVar("M", bound=Mobject | None)
 class WorklistExtraDataDict(TypedDict, Generic[L], total=False):
     cfg: ControlFlowGraph
     lattice_graph: LatticeGraph[L]
+    widening_operator_tex: WideningOperatorTex[L]
     control_flow_function_tex: AbstractEnvironmentUpdateInstances
     flow_function_tex: AbstractEnvironmentUpdateInstances | None
     condition_update_function_tex: AbstractEnvironmentUpdateInstances
@@ -114,6 +120,10 @@ class WorklistExtraDataDict(TypedDict, Generic[L], total=False):
     lattice_successor_part: VMobject
     lattice_join_title: Text
     lattice_joined_part: VMobject
+    widening_operator_instance_part: VMobject
+    widening_operator_modification_part: VMobject
+    widening_operator_widen_title: Text
+    widening_operator_widened_part: VMobject
 
 
 class AbstractAnalysisScene(
@@ -149,6 +159,29 @@ class AbstractAnalysisScene(
     sorting_function: Callable[[Iterable[Hashable]], list[Hashable]] = (
         default_sorting_function
     )
+
+    # Widening operator
+    widening_operator: WideningOperator[L] | None = None
+    widening_operator_title: str = (
+        "We will use the following widening operator for our analysis :"  # noqa: E501
+    )
+    widening_operator_title_width: float = fw(0.95)
+    widening_operator_title_height: float = fh(0.175)
+    widening_operator_title_position: tuple[float, float, float] = (
+        fw(1),
+        fh(-0.6125),
+        0,
+    )
+    widening_operator_width: float = fw(0.95)
+    widening_operator_height: float = fh(0.775)
+    widening_operator_position: tuple[float, float, float] = (fw(1), fh(-1.0775), 0)
+    widening_operator_camera_position: tuple[float, float, float] = (fw(1), fh(-1), 0)
+    widening_operator_wait_time: float = 5.0
+    widening_operator_widen_title_template: str = (
+        "We apply the widening operator on {last_value} and {new_value} which results in {widened_abstract_value}"  # noqa: E501
+    )
+    widening_operator_widen_highlight_wait_time: float = 2.5
+    widening_operator_widen_set_time: float = 2.5
 
     # Control-flow function
     control_flow_function: ControlFlowFunction[L]
@@ -270,7 +303,7 @@ class AbstractAnalysisScene(
         "We try to check if we need to process the successor {successor_program_point} :"  # noqa: E501
     )
     worklist_unreachable_title_template: str = (
-        "We reached an unreachable program point {successor_program_point} so we skip it :"
+        "We found the unreachable successor {successor_program_point} so we skip it :"
     )
     worklist_condition_update_variables_title_template: str = (
         "We update the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the condition update function :"  # noqa: E501
@@ -358,6 +391,35 @@ class AbstractAnalysisScene(
         self.play(Unwrite(lattice_title))
 
         return lattice_graph
+
+    def show_widening_operator(self) -> WideningOperatorTex[L]:
+        widening_operator_title = Text(self.widening_operator_title)
+
+        scale_mobject(
+            widening_operator_title,
+            self.widening_operator_title_width,
+            self.widening_operator_title_height,
+        )
+        widening_operator_title.move_to(self.widening_operator_title_position)
+
+        assert self.widening_operator is not None
+
+        widening_operator_tex = WideningOperatorTex(self.widening_operator.instances)
+
+        scale_mobject(
+            widening_operator_tex,
+            self.widening_operator_width,
+            self.widening_operator_height,
+        )
+        widening_operator_tex.move_to(self.widening_operator_position)
+
+        self.play(Write(widening_operator_title), Create(widening_operator_tex))
+
+        self.wait(self.widening_operator_wait_time)
+
+        self.play(Unwrite(widening_operator_title))
+
+        return widening_operator_tex
 
     def show_control_flow_function(self) -> AbstractEnvironmentUpdateInstances:
         control_flow_function_title = Text(self.control_flow_function_title)
@@ -1184,6 +1246,10 @@ class AbstractAnalysisScene(
             data["condition"],
         )
 
+        if data["res_cond_variables"] is None:
+            self.play(self.move_camera_animation(self.worklist_camera_position))
+            return
+
         extra_data["worklist_condition_update_variables_title"] = Text(
             self.worklist_condition_update_variables_title_template.format(
                 variables=", ".join(variable for variable in data["res_cond_variables"])
@@ -1404,8 +1470,8 @@ class AbstractAnalysisScene(
 
         extra_data["lattice_join_title"] = Text(
             self.lattice_join_title_template.format(
-                abstract_value1=data["current_abstract_value"],
-                abstract_value2=data["successor_abstract_value"],
+                abstract_value1=data["successor_abstract_value"],
+                abstract_value2=data["current_abstract_value"],
                 joined_abstract_value=data["joined_abstract_value"],
             )
         )
@@ -1467,6 +1533,112 @@ class AbstractAnalysisScene(
             extra_data["lattice_joined_part"],
             extra_data["new_lattice_graph"],
         )
+
+    def while_widen(
+        self,
+        data: WhileWidenDict,
+        extra_data: WorklistExtraDataDict[L],
+    ):
+        extra_data["successor_program_point_part"] = (
+            extra_data["table"]
+            .get_variable_part(data["successor"], data["variable"])
+            .copy()
+        )
+        extra_data["res_cond_part"] = (
+            extra_data["res_table"].get_res_cond_variable_part(data["variable"]).copy()
+        )
+
+        extra_data["widening_operator_instance_part"] = extra_data[
+            "widening_operator_tex"
+        ].get_instance_part(data["widened_instance_id"])
+
+        extra_data["widening_operator_widen_title"] = Text(
+            self.widening_operator_widen_title_template.format(
+                last_value=data["successor_abstract_value"],
+                new_value=data["current_abstract_value"],
+                widened_abstract_value=data["widened_abstract_value"],
+            )
+        )
+        scale_mobject(
+            extra_data["widening_operator_widen_title"],
+            self.widening_operator_title_width,
+            self.widening_operator_title_height,
+        )
+        extra_data["widening_operator_widen_title"].move_to(
+            self.widening_operator_title_position
+        )
+
+        instance_rectangle = SurroundingRectangle(
+            extra_data["widening_operator_instance_part"]
+        )
+
+        self.play(
+            Create(instance_rectangle),
+            Create(extra_data["widening_operator_widen_title"]),
+            Transform(
+                extra_data["successor_program_point_part"],
+                extra_data["widening_operator_instance_part"],
+            ),
+            Transform(
+                extra_data["res_cond_part"],
+                extra_data["widening_operator_instance_part"],
+            ),
+            self.move_camera_animation(self.widening_operator_camera_position),
+        )
+
+        self.remove(
+            extra_data["successor_program_point_part"],
+            extra_data["res_cond_part"],
+        )
+
+        self.wait(self.widening_operator_widen_highlight_wait_time)
+
+        extra_data["widening_operator_modification_part"] = (
+            extra_data["widening_operator_tex"]
+            .get_modification_part(data["widened_instance_id"])
+            .copy()
+        )
+
+        modification_rectangle = SurroundingRectangle(
+            extra_data["widening_operator_modification_part"]
+        )
+
+        self.play(
+            Transform(
+                instance_rectangle,
+                modification_rectangle,
+            ),
+        )
+
+        self.wait(self.widening_operator_widen_set_time)
+
+        self.remove(instance_rectangle)
+
+        with (
+            self.animate_mobject(
+                extra_data["table"],
+                self.create_worklist_table(
+                    data["variables"], data["abstract_environments"]
+                ),
+            ) as (
+                table_animation,
+                extra_data["table"],
+            ),
+        ):
+            self.play(
+                Uncreate(modification_rectangle),
+                Uncreate(extra_data["widening_operator_widen_title"]),
+                Transform(
+                    extra_data["widening_operator_modification_part"],
+                    extra_data["table"].get_variable_part(
+                        data["successor"], data["variable"]
+                    ),
+                ),
+                self.move_camera_animation(self.worklist_camera_position),
+                table_animation,
+            )
+
+        self.remove(extra_data["widening_operator_modification_part"])
 
     def after_join(
         self,
@@ -1596,6 +1768,7 @@ class AbstractAnalysisScene(
         program_cfg: nx.DiGraph[ProgramPoint],
         cfg: ControlFlowGraph,
         lattice_graph: LatticeGraph[L],
+        widening_operator_tex: WideningOperatorTex | None,
         control_flow_function_tex: AbstractEnvironmentUpdateInstances,
         flow_function_tex: AbstractEnvironmentUpdateInstances | None,
         condition_update_function_tex: AbstractEnvironmentUpdateInstances,
@@ -1604,6 +1777,7 @@ class AbstractAnalysisScene(
             self.program.parameters,
             self.program.variables,
             self.lattice,
+            self.widening_operator,
             self.control_flow_function,
             self.condition_update_function,
             entry_point,
@@ -1612,6 +1786,7 @@ class AbstractAnalysisScene(
             {
                 "cfg": cfg,
                 "lattice_graph": lattice_graph,
+                "widening_operator_tex": widening_operator_tex,
                 "control_flow_function_tex": control_flow_function_tex,
                 "flow_function_tex": flow_function_tex,
                 "condition_update_function_tex": condition_update_function_tex,
@@ -1626,6 +1801,15 @@ class AbstractAnalysisScene(
         self.play(self.move_camera_animation(self.lattice_camera_position))
 
         lattice_graph = self.show_lattice_graph()
+
+        if self.widening_operator is not None:
+            self.play(
+                self.move_camera_animation(self.widening_operator_camera_position)
+            )
+
+            widening_operator_tex = self.show_widening_operator()
+        else:
+            widening_operator_tex = None
 
         self.play(
             self.move_camera_animation(self.control_flow_function_camera_position)
@@ -1670,6 +1854,7 @@ class AbstractAnalysisScene(
             program_cfg,
             cfg,
             lattice_graph,
+            widening_operator_tex,
             control_flow_function_tex,
             flow_function_tex,
             condition_update_function_tex,

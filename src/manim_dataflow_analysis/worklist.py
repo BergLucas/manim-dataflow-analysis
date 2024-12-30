@@ -4,12 +4,14 @@ from typing import Collection, Generic, Mapping, Set, TypeVar, Protocol, TypedDi
 
 from manim.mobject.table import MobjectTable
 from manim.mobject.text.tex_mobject import MathTex
+from manim.mobject.text.text_mobject import Text
 
 from manim_dataflow_analysis.abstract_environment import AbstractEnvironment
 from manim_dataflow_analysis.cfg import ProgramPoint, succ, cond
 from manim_dataflow_analysis.lattice import Lattice
 from manim_dataflow_analysis.flow_function import ControlFlowFunction
 from manim_dataflow_analysis.condition_update_function import ConditionUpdateFunction
+from manim_dataflow_analysis.widening_operator import WideningOperator
 
 from frozendict import frozendict
 import networkx as nx
@@ -44,13 +46,13 @@ class WorklistTable(MobjectTable, Generic[L]):
     ):
         self.values_mobjects = {
             program_point: {
-                variable: MathTex(str(abstract_environment[variable]))
+                variable: Text(str(abstract_environment[variable]))
                 for variable in variables
             }
             for program_point, abstract_environment in abstract_environments.items()
         }
         self.program_points_mobjects = {
-            program_point: MathTex(str(program_point.point))
+            program_point: Text(str(program_point.point))
             for program_point in abstract_environments
         }
         table = [
@@ -69,10 +71,10 @@ class WorklistTable(MobjectTable, Generic[L]):
 
         super().__init__(table, include_outer_lines=True)
 
-    def get_variable_part(self, program_point: ProgramPoint, variable: str) -> MathTex:
+    def get_variable_part(self, program_point: ProgramPoint, variable: str) -> Text:
         return self.values_mobjects[program_point][variable]
 
-    def get_program_point_part(self, program_point: ProgramPoint) -> MathTex:
+    def get_program_point_part(self, program_point: ProgramPoint) -> Text:
         return self.program_points_mobjects[program_point]
 
 
@@ -84,13 +86,13 @@ class ResTable(MobjectTable, Generic[L]):
         res_cond: AbstractEnvironment[L] | None = None,
     ):
         self.res_mobjects = {
-            variable: MathTex(
+            variable: Text(
                 str(res[variable]) if res is not None and variable in res else "?"
             )
             for variable in variables
         }
         self.res_cond_mobjects = {
-            variable: MathTex(
+            variable: Text(
                 str(res_cond[variable])
                 if res_cond is not None and variable in res_cond
                 else "?"
@@ -100,25 +102,25 @@ class ResTable(MobjectTable, Generic[L]):
 
         table = [
             [
-                MathTex("Variables"),
+                Text("Variables"),
                 *(MathTex(rf"\phi_p({variable})") for variable in variables),
             ],
             [
-                MathTex("res"),
+                Text("res"),
                 *(self.res_mobjects[variable] for variable in variables),
             ],
             [
-                MathTex("res[COND(p, p')]"),
+                Text("res[COND(p, p')]"),
                 *(self.res_cond_mobjects[variable] for variable in variables),
             ],
         ]
 
         super().__init__(table, include_outer_lines=True)
 
-    def get_res_variable_part(self, variable: str) -> MathTex:
+    def get_res_variable_part(self, variable: str) -> Text:
         return self.res_mobjects[variable]
 
-    def get_res_cond_variable_part(self, variable: str) -> MathTex:
+    def get_res_cond_variable_part(self, variable: str) -> Text:
         return self.res_cond_mobjects[variable]
 
 
@@ -163,6 +165,14 @@ class WhileJoinDict(AfterIncludedDict[L, E]):
     joined_abstract_value: L
     current_abstract_value: L
     successor_abstract_value: L
+
+
+class WhileWidenDict(AfterIncludedDict[L, E]):
+    variable: str
+    widened_abstract_value: L
+    current_abstract_value: L
+    successor_abstract_value: L
+    widened_instance_id: int
 
 
 EX = TypeVar("EX", bound=dict[str, object])
@@ -253,6 +263,13 @@ class WorklistListener(Protocol[L, E, EX]):
     ) -> None:
         """Called after the join operation is applied."""
 
+    def while_widen(
+        self,
+        data: WhileWidenDict[L, E],
+        extra_data: EX,
+    ) -> None:
+        """Called while the widening operation is applied."""
+
     def after_add(
         self,
         data: AfterIncludedDict[L, E],
@@ -286,6 +303,7 @@ def worklist_algorithm(
     parameters: set[str],
     variables: set[str],
     lattice: Lattice[L],
+    widening_operator: WideningOperator[L],
     control_flow_function: ControlFlowFunction[L],
     condition_update_function: ConditionUpdateFunction[L, E],
     entry_point: ProgramPoint,
@@ -391,27 +409,56 @@ def worklist_algorithm(
                 if not data["included"]:
                     listener.after_not_included(data, extra_data)
 
-                    for variable, joined_abstract_value in data[
-                        "abstract_environments"
-                    ][data["successor"]].join_generator(data["res_cond"]):
-                        data: AfterIncludedDict[L, E] | WhileJoinDict[L, E]
-
-                        data["variable"] = variable
-                        data["joined_abstract_value"] = joined_abstract_value
-                        data["current_abstract_value"] = data["res_cond"][
-                            data["variable"]
-                        ]
-                        data["successor_abstract_value"] = data[
+                    if widening_operator is None:
+                        for variable, joined_abstract_value in data[
                             "abstract_environments"
-                        ][data["successor"]][data["variable"]]
+                        ][data["successor"]].join_generator(data["res_cond"]):
+                            data: AfterIncludedDict[L, E] | WhileJoinDict[L, E]
 
-                        data["abstract_environments"][data["successor"]] = data[
-                            "abstract_environments"
-                        ][data["successor"]].set(
-                            {data["variable"]: data["joined_abstract_value"]}
-                        )
+                            data["variable"] = variable
+                            data["joined_abstract_value"] = joined_abstract_value
+                            data["current_abstract_value"] = data["res_cond"][
+                                data["variable"]
+                            ]
+                            data["successor_abstract_value"] = data[
+                                "abstract_environments"
+                            ][data["successor"]][data["variable"]]
 
-                        listener.while_join(data, extra_data)
+                            data["abstract_environments"][data["successor"]] = data[
+                                "abstract_environments"
+                            ][data["successor"]].set(
+                                {data["variable"]: data["joined_abstract_value"]}
+                            )
+
+                            listener.while_join(data, extra_data)
+                    else:
+                        for (
+                            variable,
+                            widened_abstract_value,
+                            widened_instance_id,
+                        ) in widening_operator.join_generator(
+                            data["abstract_environments"][data["successor"]],
+                            data["res_cond"],
+                        ):
+                            data: AfterIncludedDict[L, E] | WhileWidenDict[L, E]
+
+                            data["variable"] = variable
+                            data["widened_abstract_value"] = widened_abstract_value
+                            data["widened_instance_id"] = widened_instance_id
+                            data["current_abstract_value"] = data["res_cond"][
+                                data["variable"]
+                            ]
+                            data["successor_abstract_value"] = data[
+                                "abstract_environments"
+                            ][data["successor"]][data["variable"]]
+
+                            data["abstract_environments"][data["successor"]] = data[
+                                "abstract_environments"
+                            ][data["successor"]].set(
+                                {data["variable"]: data["widened_abstract_value"]}
+                            )
+
+                            listener.while_widen(data, extra_data)
 
                     listener.after_join(data, extra_data)
 
