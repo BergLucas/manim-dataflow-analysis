@@ -399,6 +399,16 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             vertices.add(vertex)
 
             if invert_direction:
+                infinite_connections = cls._fix_infinite_vertices(
+                    bottom_infinite_vertices,
+                    edges,
+                    vertex,
+                    invert_direction,
+                )
+                all_children_done = not lattice.has_other_predecessors_than(
+                    vertex,
+                    infinite_connections,
+                )
                 incomplete_vertices = top_incomplete_vertices
                 half_vertical_size = half_top_vertical_size
                 infinite_vertices = top_infinite_vertices
@@ -409,6 +419,16 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                     if lattice.is_predecessor(vertex, visible_vertex)
                 }
             else:
+                infinite_connections = cls._fix_infinite_vertices(
+                    top_infinite_vertices,
+                    edges,
+                    vertex,
+                    invert_direction,
+                )
+                all_children_done = not lattice.has_other_successors_than(
+                    vertex,
+                    infinite_connections,
+                )
                 incomplete_vertices = bottom_incomplete_vertices
                 half_vertical_size = half_bottom_vertical_size
                 infinite_vertices = bottom_infinite_vertices
@@ -418,6 +438,9 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                     for visible_vertex in visible_vertices
                     if lattice.is_successor(vertex, visible_vertex)
                 }
+
+            if all_children_done:
+                continue
 
             children, is_finished = cls._take_max_horizontal_size(
                 children_iterable,
@@ -577,6 +600,29 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             layout_scale=layout_scale,
             **kwargs,
         )
+
+    @classmethod
+    def _fix_infinite_vertices(
+        cls,
+        infinite_vertices: dict[InfiniteNode[L], set[L]],
+        edges: set[
+            tuple[
+                L | InfiniteNode[L] | IncompleteNode | BridgeNode[L],
+                L | InfiniteNode[L] | IncompleteNode | BridgeNode[L],
+            ]
+        ],
+        vertex: L,
+        invert_direction: bool,
+    ) -> set[L]:
+        infinite_connections = infinite_vertices.pop(InfiniteNode(vertex), set())
+
+        for infinite_connection in infinite_connections:
+            if invert_direction:
+                edges.add((infinite_connection, vertex))
+            else:
+                edges.add((vertex, infinite_connection))
+
+        return infinite_connections
 
     @classmethod
     def _take_max_horizontal_size(
