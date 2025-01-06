@@ -36,16 +36,13 @@ L = TypeVar("L")
 
 class Lattice(Protocol[L]):
     @abstractmethod
-    def top(self) -> L:
-        ...
+    def top(self) -> L: ...
 
     @abstractmethod
-    def bottom(self) -> L:
-        ...
+    def bottom(self) -> L: ...
 
     @abstractmethod
-    def successors(self, value: L) -> Iterable[L]:
-        ...
+    def successors(self, value: L) -> Iterable[L]: ...
 
     def is_successor(self, value: L, successor: L) -> bool:
         return any(
@@ -70,8 +67,7 @@ class Lattice(Protocol[L]):
         )
 
     @abstractmethod
-    def predecessors(self, value: L) -> Iterable[L]:
-        ...
+    def predecessors(self, value: L) -> Iterable[L]: ...
 
     def is_predecessor(self, value: L, predecessor: L) -> bool:
         return any(
@@ -517,7 +513,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             True,
         )
 
-        cls._create_infinite_edges(
+        cls._create_incomplete_edges(
             bottom_infinite_vertices,
             bottom_incomplete_vertices,
             half_bottom_vertical_size,
@@ -526,7 +522,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             False,
         )
 
-        cls._create_infinite_edges(
+        cls._create_incomplete_edges(
             top_infinite_vertices,
             top_incomplete_vertices,
             half_top_vertical_size,
@@ -535,7 +531,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             True,
         )
 
-        cls._create_incomplete_edges(
+        cls._create_infinite_edges(
             lattice,
             bottom_incomplete_vertices,
             bottom_infinite_vertices,
@@ -544,7 +540,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
             False,
         )
 
-        cls._create_incomplete_edges(
+        cls._create_infinite_edges(
             lattice,
             top_incomplete_vertices,
             top_infinite_vertices,
@@ -849,7 +845,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                         )
 
     @classmethod
-    def _create_infinite_edges(
+    def _create_incomplete_edges(
         cls,
         infinite_vertices: dict[InfiniteNode[L], set[L]],
         incomplete_vertices: dict[
@@ -890,7 +886,7 @@ class LatticeGraph(Generic[L], BetterDiGraph):
                     edges.add((infinite_connection, infinite_vertex))
 
     @classmethod
-    def _create_incomplete_edges(
+    def _create_infinite_edges(
         cls,
         lattice: Lattice[L],
         incomplete_vertices: dict[
@@ -955,9 +951,9 @@ class LatticeGraph(Generic[L], BetterDiGraph):
         ],
         final_visible_vertices: set[L],
     ) -> None:
-        vertices_connections: dict[
-            L | InfiniteNode[L], set[L | InfiniteNode[L]]
-        ] = defaultdict(set)
+        vertices_connections: dict[L | InfiniteNode[L], set[L | InfiniteNode[L]]] = (
+            defaultdict(set)
+        )
 
         bridge_vertices: set[tuple[InfiniteNode[L], InfiniteNode[L]]] = set()
         for bottom_infinite_vertex in bottom_infinite_vertices:
