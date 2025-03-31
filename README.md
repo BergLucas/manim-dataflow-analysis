@@ -6,18 +6,26 @@ manim-dataflow-analysis is a library that improves [manim](https://www.manim.com
 
 ## Requirements
 
-The application requires:
+The library requires:
 
 - [Python](https://www.python.org/) ~= 3.11
 - [pip](https://pip.pypa.io/en/stable/)
 
 ## Download & Installation
 
-There is only one way to download and install the application:
+There are two way to download and install the library:
+
+### Using Git
+
+You can install the library using Git by running the following command:
+
+```bash
+pip install git+https://github.com/BergLucas/manim-dataflow-analysis.git
+```
 
 ### Using the GitHub releases
 
-You can download the application on the [downloads page](https://github.com/BergLucas/manim-dataflow-analysis/releases). Then, you can install the application by running the following command:
+You can download the library on the [downloads page](https://github.com/BergLucas/manim-dataflow-analysis/releases). Then, you can install the library by running the following command:
 
 ```bash
 pip install manim_dataflow_analysis-X.X.X-py3-none-any.whl
