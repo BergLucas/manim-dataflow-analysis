@@ -33,6 +33,12 @@ pip install manim_dataflow_analysis-X.X.X-py3-none-any.whl
 
 (Note: The X.X.X must be replaced by the version that you want to install.)
 
+## Example
+
+Here is a list of example repositories using the library:
+
+- [https://github.com/UNamurCSFaculty/INFOM227_Animations](https://github.com/UNamurCSFaculty/INFOM227_Animations)
+
 ## License
 
 All code is licensed for others under a MIT license (see [LICENSE](https://github.com/BergLucas/manim-dataflow-analysis/blob/main/LICENSE)).
