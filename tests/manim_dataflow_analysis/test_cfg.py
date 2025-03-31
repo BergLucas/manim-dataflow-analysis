@@ -1,5 +1,7 @@
 import unittest
+
 import networkx as nx
+
 from manim_dataflow_analysis.cfg import cfg_layout
 
 
@@ -85,9 +87,9 @@ class TestCfgLayout(unittest.TestCase):
         self.assertDictEqual(
             {node: tuple(coord) for node, coord in layout.items()},
             {
-                1: (0, 2, 0),
-                2: (0, 1, 0),
+                1: (0, 3, 0),
+                2: (0, 2, 0),
                 3: (0, 0, 0),
-                4: (1, 0, 0),
+                4: (1, 1, 0),
             },
         )

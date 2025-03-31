@@ -153,9 +153,9 @@ class AbstractAnalysisScene(
     lattice_join_wait_time: float = 5.0
     lattice_max_horizontal_size_per_vertex: int = 8
     lattice_max_vertical_size: int = 8
-    sorting_function: Callable[
-        [Iterable[Hashable]], list[Hashable]
-    ] = default_sorting_function
+    sorting_function: Callable[[Iterable[Hashable]], list[Hashable]] = (
+        default_sorting_function
+    )
 
     # Widening operator
     widening_operator: WideningOperator[L] | None = None

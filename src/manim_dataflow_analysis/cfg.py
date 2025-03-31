@@ -58,26 +58,19 @@ class PathArrow(TipableVMobject):
 
 
 class GraphNode(Protocol):
-    def get_center(self) -> Point3D:
-        ...
+    def get_center(self) -> Point3D: ...
 
-    def get_top(self) -> Point3D:
-        ...
+    def get_top(self) -> Point3D: ...
 
-    def get_bottom(self) -> Point3D:
-        ...
+    def get_bottom(self) -> Point3D: ...
 
-    def get_right(self) -> Point3D:
-        ...
+    def get_right(self) -> Point3D: ...
 
-    def get_left(self) -> Point3D:
-        ...
+    def get_left(self) -> Point3D: ...
 
-    def get_zenith(self) -> Point3D:
-        ...
+    def get_zenith(self) -> Point3D: ...
 
-    def get_nadir(self) -> Point3D:
-        ...
+    def get_nadir(self) -> Point3D: ...
 
 
 class EdgeLayoutFunction(Protocol):
@@ -86,8 +79,7 @@ class EdgeLayoutFunction(Protocol):
         vertices: dict[Hashable, GraphNode],
         start: Hashable,
         end: Hashable,
-    ) -> list[Point3D]:
-        ...
+    ) -> list[Point3D]: ...
 
 
 def default_edge_layout(
@@ -105,8 +97,10 @@ class LayoutAndEdgeLayoutFunction(Protocol):
         scale: float | tuple[float, float, float] = 2,
         *args: Any,
         **kwargs: Any,
-    ) -> tuple[dict[Hashable, Point3D], EdgeLayoutFunction,]:
-        ...
+    ) -> tuple[
+        dict[Hashable, Point3D],
+        EdgeLayoutFunction,
+    ]: ...
 
 
 def __cfg_successors(
@@ -244,7 +238,7 @@ def __cfg_node_depth(
                 *(
                     coord_x - (x - VERTEX_WIDTH)
                     for coord_x, coord_y in coords.values()
-                    if y < coord_y and coord_y < min_coord_y
+                    if y < coord_y < min_coord_y
                 ),
                 *(
                     coord_x + (loop_width - VERTEX_WIDTH) - (x - VERTEX_WIDTH)
@@ -252,7 +246,7 @@ def __cfg_node_depth(
                         (*coords[coord_vertex], loop_width)
                         for coord_vertex, (loop_width, _) in loops.items()
                     )
-                    if y < coord_y and coord_y < min_coord_y
+                    if y < coord_y < min_coord_y
                 ),
             ),
             default=all_successors_width,
@@ -317,7 +311,10 @@ def cfg_layout(
     scale: float | tuple[float, float, float] = 2,
     condition_vertices: dict[Hashable, tuple[Hashable]] | None = None,
     vertex_spacing: tuple[float, float] = (1, 1),
-) -> tuple[dict[Hashable, Point3D], EdgeLayoutFunction,]:
+) -> tuple[
+    dict[Hashable, Point3D],
+    EdgeLayoutFunction,
+]:
     if condition_vertices is None:
         raise ValueError("The CFG layout requires the condition vertices to be passed")
 

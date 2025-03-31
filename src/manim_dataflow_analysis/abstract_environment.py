@@ -22,9 +22,12 @@ class AbstractEnvironment(Generic[L]):
         self, other: AbstractEnvironment[L]
     ) -> Generator[tuple[str, L], None, None]:
         for variable in self.variables | other.variables:
-            yield variable, self.lattice.join(
-                self.variables.get(variable, self.lattice.bottom()),
-                other.variables.get(variable, self.lattice.bottom()),
+            yield (
+                variable,
+                self.lattice.join(
+                    self.variables.get(variable, self.lattice.bottom()),
+                    other.variables.get(variable, self.lattice.bottom()),
+                ),
             )
 
     def join(self, other: AbstractEnvironment[L]) -> AbstractEnvironment[L]:
@@ -40,9 +43,13 @@ class AbstractEnvironment(Generic[L]):
             self_abstract_value = self.variables.get(variable)
             other_abstract_value = other.variables.get(variable)
 
-            yield variable, self_abstract_value is None or (
-                other_abstract_value is not None
-                and self.lattice.includes(self_abstract_value, other_abstract_value)
+            yield (
+                variable,
+                self_abstract_value is None
+                or (
+                    other_abstract_value is not None
+                    and self.lattice.includes(self_abstract_value, other_abstract_value)
+                ),
             )
 
     def includes(self, other: AbstractEnvironment[L]) -> bool:

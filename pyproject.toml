@@ -1,43 +1,55 @@
-[tool.poetry]
+[project]
 name = "manim-dataflow-analysis"
 version = "0.1.0"
-description = ""
-authors = ["Berg Lucas <55436804+BergLucas@users.noreply.github.com>"]
-license = "MIT"
+description = "manim-dataflow-analysis is a library that improves manim so that it can generate dataflow analysis animations."
+authors = [
+    { name = "Berg Lucas", email = "55436804+BergLucas@users.noreply.github.com" },
+]
 readme = "README.md"
+license = "MIT"
+keywords = ["Poetry", "manim_dataflow_analysis"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+]
+requires-python = ">=3.9,<3.13"
+dependencies = [
+    "manim (>=0.18.1,<0.19.0)",
+    "networkx (>=2.6)",
+    "types-networkx (>=2.6)",
+    "frozendict (>=2.4.6,<3.0.0)",
+]
 
-[tool.poetry.dependencies]
-python = ">=3.9,<3.13"
-manim = "^0.18.1"
-networkx = ">=2.6"
-types-networkx = ">=2.6"
-frozendict = "^2.4.6"
+[tool.poetry]
+requires-poetry = "^2.0.0"
+packages = [{ include = "manim_dataflow_analysis", from = "src" }]
+
+[tool.poetry.requires-plugins]
+poethepoet = "^0.33.0"
 
 [tool.poetry.group.dev.dependencies]
-black = "^23.3.0"
-mypy = "^1.4.1"
-coverage = "^7.2.7"
-ruff = "^0.6.4"
-
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+ruff = "^0.9.10"
+mypy = "^1.15.0"
+coverage = "^7.6.12"
 
 [tool.poe.tasks]
 test = "python -m unittest -v"
 coverage = "coverage run -m unittest -v"
 coverage-report = ["coverage", { cmd = "coverage report" }]
 coverage-html = ["coverage", { cmd = "coverage html" }]
-mypy = "mypy src"
-black = "black src"
-ruff = "ruff check src"
-ruff-fix = "ruff check --fix src"
-ruff-ufix = "ruff check --fix --unsafe-fixes src"
-lint = ["black", "ruff", "mypy"]
+format = "ruff format src tests"
+check = "ruff check --fix src tests"
+check-nofix = "ruff check src tests"
+check-unsafe = "ruff check --fix --unsafe src tests"
+typecheck = "mypy src tests"
+lint = ["format", "check", "typecheck"]
+verify = ["lint", "test"]
 
 [tool.coverage.run]
-relative_files = true
 branch = true
 source = ["src/manim_dataflow_analysis", "tests"]
 
@@ -62,3 +74,7 @@ convention = "google"
 
 [tool.mypy]
 ignore_missing_imports = true
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

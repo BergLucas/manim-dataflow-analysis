@@ -11,16 +11,14 @@ L = TypeVar("L")
 class FlowFunction(Protocol[L]):
     @property
     @abstractmethod
-    def instances(self) -> Sequence[tuple[str, str, str | None]]:
-        ...
+    def instances(self) -> Sequence[tuple[str, str, str | None]]: ...
 
     @abstractmethod
     def get_variables(
         self,
         statement: AstStatement,
         abstract_environment: AbstractEnvironment[L],
-    ) -> tuple[Mapping[str, L], int]:
-        ...
+    ) -> tuple[Mapping[str, L], int]: ...
 
     def apply(
         self,
@@ -42,21 +40,18 @@ class FlowFunction(Protocol[L]):
 class ControlFlowFunction(Protocol[L]):
     @property
     @abstractmethod
-    def instances(self) -> Sequence[tuple[str, str, str | None]]:
-        ...
+    def instances(self) -> Sequence[tuple[str, str, str | None]]: ...
 
     @property
     @abstractmethod
-    def flow_function(self) -> FlowFunction[L] | None:
-        ...
+    def flow_function(self) -> FlowFunction[L] | None: ...
 
     @abstractmethod
     def get_variables(
         self,
         program_point: ProgramPoint,
         abstract_environment: AbstractEnvironment[L],
-    ) -> tuple[Mapping[str, L], int | tuple[int, int]]:
-        ...
+    ) -> tuple[Mapping[str, L], int | tuple[int, int]]: ...
 
     def apply(
         self,

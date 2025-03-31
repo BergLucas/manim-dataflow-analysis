@@ -45,16 +45,14 @@ class WideningOperatorTex(MathTex):
 class WideningOperator(Protocol[L]):
     @property
     @abstractmethod
-    def instances(self) -> Sequence[tuple[str, str]]:
-        ...
+    def instances(self) -> Sequence[tuple[str, str]]: ...
 
     @abstractmethod
     def apply(
         self,
         last_value: L,
         new_value: L,
-    ) -> tuple[L, int]:
-        ...
+    ) -> tuple[L, int]: ...
 
     def join_generator(
         self,
