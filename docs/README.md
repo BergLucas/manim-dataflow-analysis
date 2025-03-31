@@ -14,7 +14,7 @@ git clone https://github.com/BergLucas/manim-dataflow-analysis.git
 
 The library requires:
 
-- [Python](https://www.python.org/) ~= 3.11
+- [Python](https://www.python.org/) ~= 3.9
 - [Poetry](https://python-poetry.org/) ~= 2.0
 
 ### Python environment setup

@@ -8,7 +8,7 @@ manim-dataflow-analysis is a library that improves [manim](https://www.manim.com
 
 The library requires:
 
-- [Python](https://www.python.org/) ~= 3.11
+- [Python](https://www.python.org/) ~= 3.9
 - [pip](https://pip.pypa.io/en/stable/)
 
 ## Download & Installation
