@@ -13,7 +13,7 @@ The library requires:
 
 ## Download & Installation
 
-There are two way to download and install the library:
+There are two ways to download and install the library:
 
 ### Using Git
 
