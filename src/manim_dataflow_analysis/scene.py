@@ -504,13 +504,15 @@ class AbstractAnalysisScene(
         program_title.move_to(self.program_title_position)
 
         program = Code(
-            code=str(self.program),
+            code_string=str(self.program),
             language="c",
-            background="window",
+            formatter_style="monokai",
             tab_width=4,
-            font="Monospace",
-            style="monokai",
-            line_no_from=self.program.line_number,
+            line_numbers_from=self.program.line_number,
+            background="window",
+            paragraph_config={
+                "font": "Monospace",
+            },
         )
 
         scale_mobject(program, self.program_width, self.program_height)
