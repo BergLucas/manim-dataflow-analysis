@@ -18,7 +18,7 @@ from manim.mobject.text.tex_mobject import MathTex
 from manim.mobject.text.text_mobject import Text
 
 from manim_dataflow_analysis.abstract_environment import AbstractEnvironment
-from manim_dataflow_analysis.cfg import ProgramPoint, cond, succ
+from manim_dataflow_analysis.cfg import ProgramPoint, cond, succ, pred
 
 if TYPE_CHECKING:
     import networkx as nx
@@ -325,10 +325,17 @@ def worklist_algorithm(
     listener: WorklistListener[L, E, EX_contra],
     extra_data: EX_contra,
 ):
+    function_entry = {entry_point}
+    branch_entry = {
+        p
+        for p in program_cfg.nodes
+        if any(len(tuple(succ(program_cfg, pp))) > 1 for pp in pred(program_cfg, p))
+    }
+
     data: BeforeWorklistCreationDict[L] = {
         "variables": variables.union(parameters),
         "abstract_environments": {
-            entry_point: AbstractEnvironment(
+            p: AbstractEnvironment(
                 lattice,
                 frozendict(
                     (
@@ -337,6 +344,7 @@ def worklist_algorithm(
                     )
                 ),
             )
+            for p in function_entry
         }
         | {
             p: AbstractEnvironment(
@@ -347,7 +355,7 @@ def worklist_algorithm(
                 ),
             )
             for p in program_cfg.nodes
-            if p != entry_point
+            if p not in function_entry
         },
     }
 
@@ -355,7 +363,7 @@ def worklist_algorithm(
 
     data = cast(AfterWorklistCreationDict[L], data)
 
-    data["worklist"] = {entry_point}
+    data["worklist"] = function_entry | branch_entry
 
     listener.after_worklist_creation(data, extra_data)
 
