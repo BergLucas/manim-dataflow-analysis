@@ -1372,6 +1372,34 @@ files = [
 testing = ["coverage", "pytest", "pytest-randomly", "pytest-xdist"]
 
 [[package]]
+name = "sortedcontainers"
+version = "2.4.0"
+description = "Sorted Containers -- Sorted List, Sorted Dict, Sorted Set"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "sortedcontainers-2.4.0-py2.py3-none-any.whl", hash = "sha256:a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0"},
+    {file = "sortedcontainers-2.4.0.tar.gz", hash = "sha256:25caa5a06cc30b6b83d11423433f65d1f9d76c4c6a0c90e3379eaa43b9bfdb88"},
+]
+
+[[package]]
+name = "sortedcontainers-stubs"
+version = "2.4.3"
+description = "Type stubs for sortedcontainers"
+optional = false
+python-versions = "<4.0,>=3.9"
+groups = ["main"]
+files = [
+    {file = "sortedcontainers_stubs-2.4.3-py3-none-any.whl", hash = "sha256:4496109dfa6645e4b675f57fbc7e42ec4d1bed2c74aab7fa379e0795e49fe406"},
+    {file = "sortedcontainers_stubs-2.4.3.tar.gz", hash = "sha256:ba172daceda4bd617d2f6ffd24582261a494da92705409651967faa40ebc75dd"},
+]
+
+[package.dependencies]
+sortedcontainers = ">=2,<3"
+typing-extensions = ">=4.1.0,<5.0.0"
+
+[[package]]
 name = "soupsieve"
 version = "2.8"
 description = "A modern CSS selector implementation for Beautiful Soup."
@@ -1565,4 +1593,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9,<3.13"
-content-hash = "14484d72a0dab78c7eb2454cad7b33f84c9a367c0dec5006aae7ae01a2fbae94"
+content-hash = "276bcd00f1a6390c8edaab1793056d996270788c6363183354b8fff40da5cb45"

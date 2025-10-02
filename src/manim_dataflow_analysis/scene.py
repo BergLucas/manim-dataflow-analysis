@@ -63,6 +63,7 @@ if TYPE_CHECKING:
     from manim.animation.animation import Animation
     from manim.mobject.text.tex_mobject import SingleStringMathTex, Tex
     from manim.mobject.types.vectorized_mobject import VMobject
+    from sortedcontainers import SortedDict, SortedSet
 
     from manim_dataflow_analysis.ast import AstFunction, AstStatement
     from manim_dataflow_analysis.condition_update_function import (
@@ -829,8 +830,8 @@ class AbstractAnalysisScene(
 
     def create_worklist_table(
         self,
-        variables: Collection[str],
-        abstract_environments: dict[ProgramPoint, AbstractEnvironment[L]],
+        variables: SortedSet[str],
+        abstract_environments: SortedDict[ProgramPoint, AbstractEnvironment[L]],
     ) -> WorklistTable[L]:
         table = WorklistTable(variables, abstract_environments)
 
@@ -862,7 +863,7 @@ class AbstractAnalysisScene(
 
         return res_table
 
-    def create_worklist_tex(self, worklist: set[ProgramPoint]) -> WorklistTex:
+    def create_worklist_tex(self, worklist: SortedSet[ProgramPoint]) -> WorklistTex:
         worklist_tex = WorklistTex(worklist)
 
         scale_mobject(
@@ -1756,8 +1757,8 @@ class AbstractAnalysisScene(
         condition_update_function_tex: AbstractEnvironmentUpdateInstances,
     ):
         worklist_algorithm(
-            set(self.program.parameters),
-            set(self.program.variables),
+            self.program.parameters,
+            self.program.variables,
             self.lattice,  # type: ignore
             self.widening_operator,  # type: ignore
             self.control_flow_function,

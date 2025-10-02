@@ -4,9 +4,7 @@ from typing import (
     TYPE_CHECKING,
     Collection,
     Generic,
-    Mapping,
     Protocol,
-    Set,
     TypedDict,
     TypeVar,
     cast,
@@ -16,9 +14,10 @@ from frozendict import frozendict
 from manim.mobject.table import MobjectTable
 from manim.mobject.text.tex_mobject import MathTex
 from manim.mobject.text.text_mobject import Text
+from sortedcontainers import SortedDict, SortedSet
 
 from manim_dataflow_analysis.abstract_environment import AbstractEnvironment
-from manim_dataflow_analysis.cfg import ProgramPoint, cond, succ, pred
+from manim_dataflow_analysis.cfg import ProgramPoint, cond, pred, succ
 
 if TYPE_CHECKING:
     import networkx as nx
@@ -35,8 +34,8 @@ E = TypeVar("E")
 
 
 class WorklistTex(MathTex):
-    def __init__(self, worklist: Set[ProgramPoint]):
-        self.worklist = tuple(worklist)
+    def __init__(self, worklist: SortedSet[ProgramPoint]):
+        self.worklist = worklist.copy()
 
         tex_strings = [r"W = \{"]
         if self.worklist:
@@ -55,20 +54,29 @@ class WorklistTex(MathTex):
 class WorklistTable(MobjectTable, Generic[L]):
     def __init__(
         self,
-        variables: Collection[str],
-        abstract_environments: Mapping[ProgramPoint, AbstractEnvironment[L]],
+        variables: SortedSet[str],
+        abstract_environments: SortedDict[ProgramPoint, AbstractEnvironment[L]],
     ):
-        self.values_mobjects = {
-            program_point: {
-                variable: Text(str(abstract_environment[variable]))
-                for variable in variables
-            }
-            for program_point, abstract_environment in abstract_environments.items()
-        }
-        self.program_points_mobjects = {
-            program_point: Text(str(program_point.point))
-            for program_point in abstract_environments
-        }
+        self.values_mobjects = SortedDict(
+            lambda p: p.point,
+            {
+                program_point: SortedDict(
+                    lambda v: v,
+                    {
+                        variable: Text(str(abstract_environment[variable]))
+                        for variable in variables
+                    },
+                )
+                for program_point, abstract_environment in abstract_environments.items()
+            },
+        )
+        self.program_points_mobjects = SortedDict(
+            lambda p: p.point,
+            {
+                program_point: Text(str(program_point.point))
+                for program_point in abstract_environments
+            },
+        )
         table = [
             [
                 MathTex("p"),
@@ -139,12 +147,12 @@ class ResTable(MobjectTable, Generic[L]):
 
 
 class BeforeWorklistCreationDict(TypedDict, Generic[L]):
-    variables: set[str]
-    abstract_environments: dict[ProgramPoint, AbstractEnvironment[L]]
+    variables: SortedSet[str]
+    abstract_environments: SortedDict[ProgramPoint, AbstractEnvironment[L]]
 
 
 class AfterWorklistCreationDict(BeforeWorklistCreationDict[L]):
-    worklist: set[ProgramPoint]
+    worklist: SortedSet[ProgramPoint]
 
 
 class AfterProgramPointSelectionDict(AfterWorklistCreationDict[L]):
@@ -314,8 +322,8 @@ class WorklistListener(Protocol[L, E, EX_contra]):
 
 
 def worklist_algorithm(
-    parameters: set[str],
-    variables: set[str],
+    parameters: tuple[str, ...],
+    variables: frozenset[str],
     lattice: Lattice[L],
     widening_operator: WideningOperator[L],
     control_flow_function: ControlFlowFunction[L],
@@ -325,45 +333,57 @@ def worklist_algorithm(
     listener: WorklistListener[L, E, EX_contra],
     extra_data: EX_contra,
 ):
-    function_entry = {entry_point}
-    branch_entry = {
-        p
-        for p in program_cfg.nodes
-        if any(len(tuple(succ(program_cfg, pp))) > 1 for pp in pred(program_cfg, p))
-    }
+    function_entry = SortedSet(
+        (entry_point,),
+        lambda p: p.point,
+    )
+    branch_entry = SortedSet(
+        (
+            p
+            for p in program_cfg.nodes
+            if any(len(tuple(succ(program_cfg, pp))) > 1 for pp in pred(program_cfg, p))
+        ),
+        lambda p: p.point,
+    )
 
     data: BeforeWorklistCreationDict[L] = {
-        "variables": variables.union(parameters),
-        "abstract_environments": {
-            p: AbstractEnvironment(
-                lattice,
-                frozendict(
-                    (
-                        *((variable, lattice.bottom()) for variable in variables),
-                        *((parameter, lattice.top()) for parameter in parameters),
-                    )
-                ),
-            )
-            for p in function_entry
-        }
-        | {
-            p: AbstractEnvironment(
-                lattice,
-                frozendict(
-                    (variable, lattice.bottom())
-                    for variable in variables.union(parameters)
-                ),
-            )
-            for p in program_cfg.nodes
-            if p not in function_entry
-        },
+        "variables": SortedSet((*variables, *parameters)),
+        "abstract_environments": SortedDict(
+            lambda p: p.point,
+            {
+                p: AbstractEnvironment(
+                    lattice,
+                    frozendict(
+                        (
+                            *((variable, lattice.bottom()) for variable in variables),
+                            *((parameter, lattice.top()) for parameter in parameters),
+                        )
+                    ),
+                )
+                for p in function_entry
+            }
+            | {
+                p: AbstractEnvironment(
+                    lattice,
+                    frozendict(
+                        (variable, lattice.bottom())
+                        for variable in variables.union(parameters)
+                    ),
+                )
+                for p in program_cfg.nodes
+                if p not in function_entry
+            },
+        ),
     }
 
     listener.before_worklist_creation(data, extra_data)
 
     data = cast(AfterWorklistCreationDict[L], data)
 
-    data["worklist"] = function_entry | branch_entry
+    data["worklist"] = SortedSet(
+        (*function_entry, *branch_entry),
+        key=lambda p: p.point,
+    )
 
     listener.after_worklist_creation(data, extra_data)
 
