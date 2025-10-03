@@ -1402,10 +1402,21 @@ class AbstractAnalysisScene(
                 table_program_point_animation,
                 extra_data["table_program_point_rectangle"],
             ),
+            self.animate_mobject(
+                extra_data["table_successor_program_point_rectangle"],
+                SurroundingRectangle(
+                    new_table.get_program_point_part(data["successor"]),
+                    color=ORANGE,
+                ),
+            ) as (
+                table_successor_program_point_animation,
+                extra_data["table_successor_program_point_rectangle"],
+            ),
         ):
             self.play(
                 FadeTransform(extra_data["table"], new_table),
                 table_program_point_animation,
+                table_successor_program_point_animation,
                 *(
                     Transform(*condition_update_part)
                     for condition_update_part in condition_update_parts
@@ -1413,6 +1424,8 @@ class AbstractAnalysisScene(
             )
             self.remove(*(part for part, _ in condition_update_parts))
 
+        self.remove(extra_data["table"])
+        self.add(new_table)
         extra_data["table"] = new_table
 
         self.wait(self.worklist_not_defined_wait_time)
