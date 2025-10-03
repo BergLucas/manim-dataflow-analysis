@@ -17,7 +17,7 @@ from manim.mobject.text.text_mobject import Text
 from sortedcontainers import SortedDict, SortedSet
 
 from manim_dataflow_analysis.abstract_environment import AbstractEnvironment
-from manim_dataflow_analysis.cfg import ProgramPoint, cond, pred, succ
+from manim_dataflow_analysis.cfg import ProgramPoint, cond, succ
 
 if TYPE_CHECKING:
     import networkx as nx
@@ -243,6 +243,13 @@ class WorklistListener(Protocol[L, E, EX_contra]):
     ) -> None:
         """Called before a successor is processed."""
 
+    def after_not_defined(
+        self,
+        data: BeforeSuccessorIterationDict[L],
+        extra_data: EX_contra,
+    ) -> None:
+        """Called if the successor abstract environment is not defined."""
+
     def after_condition_update_function_application(
         self,
         data: AfterConditionUpdateFunctionApplicationDict[L, E],
@@ -294,14 +301,14 @@ class WorklistListener(Protocol[L, E, EX_contra]):
 
     def after_add(
         self,
-        data: AfterIncludedDict[L, E],
+        data: BeforeSuccessorIterationDict[L],
         extra_data: EX_contra,
     ) -> None:
         """Called after a successor is added to the worklist."""
 
     def after_successor_iteration(
         self,
-        data: AfterConditionUpdateFunctionApplicationDict[L, E],
+        data: BeforeSuccessorIterationDict[L],
         extra_data: EX_contra,
     ) -> None:
         """Called after a successor is processed."""
@@ -333,25 +340,12 @@ def worklist_algorithm(
     listener: WorklistListener[L, E, EX_contra],
     extra_data: EX_contra,
 ):
-    function_entry = SortedSet(
-        (entry_point,),
-        lambda p: p.point,
-    )
-    branch_entry = SortedSet(
-        (
-            p
-            for p in program_cfg.nodes
-            if any(len(tuple(succ(program_cfg, pp))) > 1 for pp in pred(program_cfg, p))
-        ),
-        lambda p: p.point,
-    )
-
     data: BeforeWorklistCreationDict[L] = {
         "variables": SortedSet((*variables, *parameters)),
         "abstract_environments": SortedDict(
             lambda p: p.point,
             {
-                p: AbstractEnvironment(
+                entry_point: AbstractEnvironment(
                     lattice,
                     frozendict(
                         (
@@ -360,18 +354,6 @@ def worklist_algorithm(
                         )
                     ),
                 )
-                for p in function_entry
-            }
-            | {
-                p: AbstractEnvironment(
-                    lattice,
-                    frozendict(
-                        (variable, lattice.bottom())
-                        for variable in variables.union(parameters)
-                    ),
-                )
-                for p in program_cfg.nodes
-                if p not in function_entry
             },
         ),
     }
@@ -380,10 +362,7 @@ def worklist_algorithm(
 
     data = cast(AfterWorklistCreationDict[L], data)
 
-    data["worklist"] = SortedSet(
-        (*function_entry, *branch_entry),
-        key=lambda p: p.point,
-    )
+    data["worklist"] = SortedSet((entry_point,), key=lambda p: p.point)
 
     listener.after_worklist_creation(data, extra_data)
 
@@ -392,7 +371,7 @@ def worklist_algorithm(
 
         data = cast(AfterProgramPointSelectionDict[L], data)
 
-        data["program_point"] = data["worklist"].pop()
+        data["program_point"] = data["worklist"].pop(0)
 
         listener.after_program_point_selection(data, extra_data)
 
@@ -443,9 +422,17 @@ def worklist_algorithm(
 
             if data["res_cond"] is None:
                 listener.after_unreachable_code(data, extra_data)
+            elif data["successor"] not in data["abstract_environments"]:
+                assert data["res_cond"] is not None
+
+                data["abstract_environments"][data["successor"]] = data["res_cond"]
+                listener.after_not_defined(data, extra_data)
+
+                data["worklist"].add(data["successor"])
+
+                listener.after_add(data, extra_data)
             else:
                 assert data["res_cond"] is not None
-                assert data["res_cond_variables"] is not None
 
                 data = cast(AfterIncludedDict[L, E], data)
 

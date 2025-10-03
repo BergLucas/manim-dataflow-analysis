@@ -111,6 +111,7 @@ class WorklistExtraDataDict(TypedDict, Generic[L], total=False):
     worklist_res_variables_title: Text
 
     worklist_unreachable_title: Text
+    worklist_not_defined_title: Text
     worklist_included_title: Text
 
     new_lattice_graph: LatticeGraph[L]
@@ -141,7 +142,7 @@ class AbstractAnalysisScene(
 
     # Lattice
     lattice: Lattice[L]
-    lattice_title: str = "We will use the following lattice for our analysis :"
+    lattice_title: str = "We will use the following lattice for our analysis:"
     lattice_title_width: float = fw(0.95)
     lattice_title_height: float = fh(0.175)
     lattice_title_position: tuple[float, float, float] = (fw(1), fh(0.3875), 0)
@@ -161,7 +162,7 @@ class AbstractAnalysisScene(
     # Widening operator
     widening_operator: WideningOperator[L] | None = None
     widening_operator_title: str = (
-        "We will use the following widening operator for our analysis :"  # noqa: E501
+        "We will use the following widening operator for our analysis:"
     )
     widening_operator_title_width: float = fw(0.95)
     widening_operator_title_height: float = fh(0.175)
@@ -182,7 +183,7 @@ class AbstractAnalysisScene(
     # Control-flow function
     control_flow_function: ControlFlowFunction[L]
     control_flow_function_title: str = (
-        "We will use the following control-flow function for our analysis :"
+        "We will use the following control-flow function for our analysis:"  # noqa: E501
     )
     control_flow_function_title_width: float = fw(0.95)
     control_flow_function_title_height: float = fw(0.175)
@@ -201,7 +202,7 @@ class AbstractAnalysisScene(
 
     # Flow function
     flow_function_title: str = (
-        "We will use the following flow function to help us for our analysis :"
+        "We will use the following flow function to help us for our analysis:"
     )
     flow_function_title_width: float = fw(0.95)
     flow_function_title_height: float = fh(0.175)
@@ -215,7 +216,7 @@ class AbstractAnalysisScene(
     # Condition update function
     condition_update_function: ConditionUpdateFunction[L, E]
     condition_update_function_title: str = (
-        "We will also use the following condition update function for our analysis :"
+        "We will also use the following condition update function for our analysis:"
     )
     condition_update_function_title_width: float = fw(0.95)
     condition_update_function_title_height: float = fh(0.175)
@@ -238,7 +239,7 @@ class AbstractAnalysisScene(
 
     # Program
     program: AstFunction
-    program_title: str = "Here is the program that we are going to analyse :"
+    program_title: str = "Here is the program that we are going to analyse:"
     program_title_width: float = fw(0.95)
     program_title_height: float = fh(0.175)
     program_title_position: tuple[float, float, float] = (fw(-1), fh(0.3875), 0)
@@ -250,7 +251,7 @@ class AbstractAnalysisScene(
 
     # Program conversion
     program_conversion_title: str = (
-        "First, we need to convert it into a control flow graph :"
+        "First, we need to convert it into a control flow graph:"
     )
     program_conversion_title_width: float = fw(0.95)
     program_conversion_title_height: float = fh(0.175)
@@ -278,26 +279,29 @@ class AbstractAnalysisScene(
 
     # Worklist
     worklist_pop_title_template: str = (
-        "We remove the program point {program_point} from the worklist :"
+        "We remove the program point {program_point} from the worklist:"
     )
-    worklist_control_flow_function_title_template: str = "We use the control-flow function on our program point {program_point} which is the statement {statement} :"  # noqa: E501
+    worklist_control_flow_function_title_template: str = "We use the control-flow function on our program point {program_point} which is the statement {statement}:"  # noqa: E501
     worklist_flow_function_title_template: str = (
-        "We use the flow function on our statement {statement} :"
+        "We use the flow function on our statement {statement}:"
     )
     worklist_condition_update_function_title_template: str = (
-        "We use the condition update function on our condition {condition} :"
+        "We use the condition update function on our condition {condition}:"
     )
-    worklist_control_flow_variables_title_template: str = "We update the res abstract environment with the variables\n{variables} coming from the control flow function :"  # noqa: E501
-    worklist_table_variables_title_template: str = "We update the rest of the res abstract environment with the variables\n{variables} coming from the abstract environment {program_point} :"  # noqa: E501
-    worklist_successor_title_template: str = "We try to check if we need to process the successor {successor_program_point} :"  # noqa: E501
+    worklist_control_flow_variables_title_template: str = "We update the res abstract environment with the variables\n{variables} coming from the control flow function:"  # noqa: E501
+    worklist_table_variables_title_template: str = "We update the rest of the res abstract environment with the variables\n{variables} coming from the abstract environment {program_point}:"  # noqa: E501
+    worklist_successor_title_template: str = (
+        "We try to check if we need to process the successor {successor_program_point}:"
+    )
     worklist_unreachable_title_template: str = (
-        "We found the unreachable successor {successor_program_point} so we skip it :"
+        "We found the unreachable successor {successor_program_point} so we skip it:"
     )
-    worklist_condition_update_variables_title_template: str = "We update the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the condition update function :"  # noqa: E501
-    worklist_res_variables_title_template: str = "We update the rest of the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the res abstract environment :"  # noqa: E501
-    worklist_is_included_title_template: str = "res[COND(p,p')] is included in the abstract environment {successor_program_point}\nso we reached a fixed point :"  # noqa: E501
-    worklist_not_included_title_template: str = "res[COND(p,p')] is not included in the abstract environment {successor_program_point}\nso we must process the successor {successor_program_point} :"  # noqa: E501
-    worklist_joined_values_title_template: str = "We join the values from the abstract environment res[COND(p,p')] with\nthe abstract environment {program_point} :"  # noqa: E501
+    worklist_condition_update_variables_title_template: str = "We update the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the condition update function:"  # noqa: E501
+    worklist_res_variables_title_template: str = "We update the rest of the res[COND(p,p')] abstract environment with the variables\n{variables} coming from the res abstract environment:"  # noqa: E501
+    worklist_not_defined_title_template: str = "The abstract environment {successor_program_point} is not defined so we define it:"  # noqa: E501
+    worklist_is_included_title_template: str = "res[COND(p,p')] is included in the abstract environment {successor_program_point}\nso we reached a fixed point:"  # noqa: E501
+    worklist_not_included_title_template: str = "res[COND(p,p')] is not included in the abstract environment {successor_program_point}\nso we must process the successor {successor_program_point}:"  # noqa: E501
+    worklist_joined_values_title_template: str = "We join the values from the abstract environment res[COND(p,p')] with\nthe abstract environment {program_point}:"  # noqa: E501
     worklist_add_successor_title_template: str = (
         "We add the successor {program_point} to the worklist :"
     )
@@ -315,6 +319,7 @@ class AbstractAnalysisScene(
     worklist_res_table_height: float = fh(0.25)
     worklist_res_table_position: tuple[float, float, float] = (fw(0.25), fh(0.225), 0)
     worklist_res_variables_wait_time: float = 5.0
+    worklist_not_defined_wait_time: float = 5.0
     worklist_included_wait_time: float = 5.0
     worklist_joined_values_wait_time: float = 5.0
     worklist_add_successor_wait_time: float = 5.0
@@ -1149,33 +1154,37 @@ class AbstractAnalysisScene(
         )
         extra_data["worklist_successor_title"].move_to(self.cfg_title_position)
 
-        with (
-            self.animate_mobject(
-                extra_data["successor_program_point_rectangle"],
-                SurroundingRectangle(
-                    extra_data["cfg"][data["successor"]],
-                    color=ORANGE,
-                ),
-            ) as (
-                successor_program_point_animation,
-                extra_data["successor_program_point_rectangle"],
+        with self.animate_mobject(
+            extra_data["successor_program_point_rectangle"],
+            SurroundingRectangle(
+                extra_data["cfg"][data["successor"]],
+                color=ORANGE,
             ),
-            self.animate_mobject(
-                extra_data["table_successor_program_point_rectangle"],
-                SurroundingRectangle(
-                    extra_data["table"].get_program_point_part(data["successor"]),
-                    color=ORANGE,
-                ),
-            ) as (
-                table_successor_program_point_animation,
-                extra_data["table_successor_program_point_rectangle"],
-            ),
+        ) as (
+            successor_program_point_animation,
+            extra_data["successor_program_point_rectangle"],
         ):
-            self.play(
-                Create(extra_data["worklist_successor_title"]),
-                successor_program_point_animation,
-                table_successor_program_point_animation,
-            )
+            if data["successor"] in data["abstract_environments"]:
+                with self.animate_mobject(
+                    extra_data["table_successor_program_point_rectangle"],
+                    SurroundingRectangle(
+                        extra_data["table"].get_program_point_part(data["successor"]),
+                        color=ORANGE,
+                    ),
+                ) as (
+                    table_successor_program_point_animation,
+                    extra_data["table_successor_program_point_rectangle"],
+                ):
+                    self.play(
+                        Create(extra_data["worklist_successor_title"]),
+                        successor_program_point_animation,
+                        table_successor_program_point_animation,
+                    )
+            else:
+                self.play(
+                    Create(extra_data["worklist_successor_title"]),
+                    successor_program_point_animation,
+                )
 
         self.wait(self.worklist_successor_wait_time)
 
@@ -1352,6 +1361,63 @@ class AbstractAnalysisScene(
         self.wait(self.worklist_unreachable_wait_time)
 
         self.play(Uncreate(extra_data["worklist_unreachable_title"]))
+
+    def after_not_defined(
+        self,
+        data: BeforeSuccessorIterationDict[L],
+        extra_data: WorklistExtraDataDict[L],
+    ) -> None:
+        extra_data["worklist_not_defined_title"] = Text(
+            self.worklist_not_defined_title_template.format(
+                successor_program_point=str(data["successor"].point),
+            )
+        )
+
+        scale_mobject(
+            extra_data["worklist_not_defined_title"],
+            self.cfg_title_width,
+            self.cfg_title_height,
+        )
+        extra_data["worklist_not_defined_title"].move_to(self.cfg_title_position)
+
+        self.play(Create(extra_data["worklist_not_defined_title"]))
+
+        new_table = self.create_worklist_table(
+            data["variables"], data["abstract_environments"]
+        )
+        condition_update_parts = tuple(
+            (
+                extra_data["res_table"].get_res_cond_variable_part(variable).copy(),
+                new_table.get_variable_part(data["successor"], variable),
+            )
+            for variable in data["variables"]
+        )
+        with (
+            self.animate_mobject(
+                extra_data["table_program_point_rectangle"],
+                SurroundingRectangle(
+                    new_table.get_program_point_part(data["program_point"])
+                ),
+            ) as (
+                table_program_point_animation,
+                extra_data["table_program_point_rectangle"],
+            ),
+        ):
+            self.play(
+                FadeTransform(extra_data["table"], new_table),
+                table_program_point_animation,
+                *(
+                    Transform(*condition_update_part)
+                    for condition_update_part in condition_update_parts
+                ),
+            )
+            self.remove(*(part for part, _ in condition_update_parts))
+
+        extra_data["table"] = new_table
+
+        self.wait(self.worklist_not_defined_wait_time)
+
+        self.play(Uncreate(extra_data["worklist_not_defined_title"]))
 
     def after_included(
         self,
@@ -1632,7 +1698,7 @@ class AbstractAnalysisScene(
 
     def after_add(
         self,
-        data: AfterIncludedDict[L, E],
+        data: BeforeSuccessorIterationDict[L],
         extra_data: WorklistExtraDataDict[L],
     ):
         extra_data["worklist_add_successor_title"] = Text(  # type: ignore
@@ -1667,7 +1733,7 @@ class AbstractAnalysisScene(
 
     def after_successor_iteration(
         self,
-        data: AfterConditionUpdateFunctionApplicationDict[L, E],
+        data: BeforeSuccessorIterationDict[L],
         extra_data: WorklistExtraDataDict[L],
     ):
         with (
@@ -1723,19 +1789,20 @@ class AbstractAnalysisScene(
                 extra_data["table_successor_program_point_rectangle"],  # type: ignore
             ),
         ):
-            if (
-                successor_program_point_animation is not None
-                and table_successor_program_point_animation is not None
-            ):
-                self.play(
-                    successor_program_point_animation,
-                    table_successor_program_point_animation,
-                )
-
             self.play(
                 res_table_animation,
                 program_point_animation,
                 table_program_point_animation,
+                *(
+                    (successor_program_point_animation,)
+                    if successor_program_point_animation is not None
+                    else ()
+                ),
+                *(
+                    (table_successor_program_point_animation,)
+                    if table_successor_program_point_animation is not None
+                    else ()
+                ),
             )
 
     def after_worklist_algorithm(
